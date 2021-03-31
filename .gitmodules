@@ -1,0 +1,3 @@
+[submodule "src\\PrimeFactorization"]
+	path = src\\PrimeFactorization
+	url = https://github.com/mikeyaworski/PrimeFactorization
