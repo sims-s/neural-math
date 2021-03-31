@@ -1,0 +1,42 @@
+---
+'data':
+  'max_pow' : 16 # Data should be in range of [2, ...2**max_pow]. How long the decode sequence should be
+  'data_loc' : './data/' # Path to data file. Either folder and will auto use the one with the largest exponent formated as "2^x.json" OR a json file
+  'input_padding' : 'pad' # either "pad" or "zeros" either represent numbers as "10._" [# + EOS + Pad Token] or "0010" [Leading 0s]
+
+'model_args':
+  'embed_dim' : 64
+  'num_encoder_layers' : 6
+  'num_decoder_layers' : 6
+  'dim_feedforward' : 128
+  'dropout' : .1
+  'shared_embeddings' : True
+  'scale_embeddings' : False
+
+'optimizer':
+  'type' : 'adam'
+  'opt_args' : 
+    'lr' : 0.001
+
+'scheduler' : 
+  'type' : linear_schedule_with_warmup
+  'n_warmup_steps' : 2000
+  'nb_epochs' : 50
+
+'loader' :
+  'train' : 
+    'batch_size' : 64
+    'shuffle' : True
+  'test' : 
+    'batch_size' : 256
+    'shuffle' : False
+
+'io':
+  'save_path' : './models/get_script_running/'
+
+'metrics' : 
+  'n_beams' : 2
+  'max_num' : -1
+
+
+'verbose' : True
