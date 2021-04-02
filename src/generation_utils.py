@@ -68,6 +68,9 @@ def postprocess(factor_list, log_prob, base_10_number, number, beam_idx, input_p
         'log_prob' : log_prob.item(),
     }
     information['n_target_factors'] = len(information['target_factor_list'])
+    information['n_target_zeros'] = information['target_str_full'].count('0')
+    information['n_target_ones'] = information['target_str_full'].count('1')
+    information['pct_target_ones'] = information['n_target_ones'] / (information['n_target_ones'] + information['n_target_zeros'])
     
     factor_list = tokenized.split('x')
     try:
@@ -84,7 +87,7 @@ def postprocess(factor_list, log_prob, base_10_number, number, beam_idx, input_p
     information['correct_product'] = information['product']==base_10_number
     information['correct_factorization'] = information['correct_product'] & all([gfm.is_prime(n) for n in information['pred_factor_list']])
     
-    information['num_prime_factors_pred'] = np.sum([len(gfm[f])==1 for f in factors if f in gfm])
+    information['num_prime_factors_pred'] = np.sum([gfm.is_prime(f) for f in factors if f in gfm])
     information['percent_prime_factors_pred'] = information['num_prime_factors_pred'] / information['n_pred_factors']
         
     

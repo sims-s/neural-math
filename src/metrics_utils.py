@@ -42,25 +42,31 @@ def compute_metrics(metric_df):
         'percent_prime_factors_pred' : 'mean',
     }).astype(float).to_dict()
     
-    
-    # Things about the target, we want to take the first one of. Otherwise, we want all of them
+    # Things about the target, we want to take the first one of b/c we're gruping by it. Otherwise, we want all of them as a list
     grouped_by_num = grouped_by_num.agg({k: 'first' if 'target' in k else list for k in list(metric_df) if not k=='target_num'}).reset_index()
+    mean_size_product_factorization = ['correct_product_mean', 'correct_product_size', 'correct_factorization_mean', 'correct_factorization_size']
     
     metrics['by_n_target_factors'] = grouped_by_num.groupby('n_target_factors').agg({
         'correct_product' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size'],
         'correct_factorization' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size']
     })
-    metrics['by_n_target_factors'].columns = ['correct_product_mean', 'correct_product_size', 'correct_factorization_mean', 'correct_factorization_size']
+    metrics['by_n_target_factors'].columns = mean_size_product_factorization
     metrics['by_n_target_factors'] = metrics['by_n_target_factors'].to_dict()
-    
+
     grouped_by_num['number_decile'] = pd.qcut(grouped_by_num['target_num'], q=10).apply(str)
     metrics['by_target_number'] = grouped_by_num.groupby('number_decile').agg({
         'correct_product' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size'],
         'correct_factorization' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size']
     })
-    metrics['by_target_number'].columns = ['correct_product_mean', 'correct_product_size', 'correct_factorization_mean', 'correct_factorization_size']
+    metrics['by_target_number'].columns = mean_size_product_factorization
     metrics['by_target_number'] = metrics['by_target_number'].to_dict()
-    
-    
+
+    grouped_by_num['pct_target_ones_decile'] = pd.qcut(grouped_by_num['pct_target_ones'], q=10).apply(str)
+    metrics['by_pct_target_ones'] = grouped_by_num.groupby('pct_target_ones_decile').agg({
+        'correct_product' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size'],
+        'correct_factorization' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size']
+    })
+    metrics['by_pct_target_ones'].columns = mean_size_product_factorization
+    metrics['by_pct_target_ones'] = metrics['by_pct_target_ones'].to_dict()
     
     return metrics
