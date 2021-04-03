@@ -6,9 +6,9 @@
 
 'model_args':
   'embed_dim' : 128
-  'num_encoder_layers' : 6
-  'num_decoder_layers' : 6
-  'dim_feedforward' : 256
+  'num_encoder_layers' : 10
+  'num_decoder_layers' : 10
+  'dim_feedforward' : 512
   'dropout' : .1
   'shared_embeddings' : True
   'scale_embeddings' : False
@@ -21,7 +21,7 @@
 'scheduler' : 
   'type' : linear_schedule_with_warmup
   'n_warmup_steps' : 4000
-  'nb_epochs' : 200
+  'nb_epochs' : 400
 
 'loader' :
   'train' : 
@@ -32,7 +32,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/larger_longer/'
+  'save_path' : './models/larger_3_400_epochs/'
 
 'metrics' : 
   'n_beams' : 2

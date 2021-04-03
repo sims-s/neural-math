@@ -10,12 +10,12 @@ import sys
 sys.path.append('./src/')
 from utils import save_json, load_json, get_max_input_size, get_max_decode_size
 from tokenizer import Tokenizer
-from data_utils import FactorizationDataset, binarize_data
+from data_utils import prepare_dataloader
 from models import Factorizer
 from optimization_utils import run_training
 from generation_utils import factor
-from metrics_utils import form_factor_df, compute_metrics
-
+from metrics_utils import compute_factorization_metrics
+from utils import get_target_checkpoint, backfill_args
 
 
 
@@ -29,24 +29,10 @@ def get_datasets(args):
     if args['verbose']:
         print('Loading data...')
     data = load_data_file(args)
-    data = binarize_data(data)
-    
-    train_dataset = FactorizationDataset(data['train'], args['data']['max_input_size'],
-                                        args['data']['max_decode_size'],
-                                        args['data']['input_padding'])
-    test_dataset = FactorizationDataset(data['test'], args['data']['max_input_size'],
-                                        args['data']['max_decode_size'],
-                                        args['data']['input_padding'])
-                                        
-    train_loader = DataLoader(train_dataset, **args['loader']['train'])
-    test_loader = DataLoader(test_dataset, **args['loader']['test'])
 
-    if args['verbose']:
-        print('Example data: ')
-        print('\t' + str(train_dataset[0]))
-        print('\t' + str(test_dataset[123]))
     
-    return train_loader, test_loader
+    return prepare_dataloader(data['train'], args, **args['loader']['train']), \
+           prepare_dataloader(data['test'], args, **args['loader']['test'])
     
 
 def compute_extra_args(args, tokenizer):
@@ -96,29 +82,10 @@ def get_model_opt_scheduler(args, device):
 def get_just_test_data(args):
     return load_data_file(args)['test']
 
-def compute_factorization_metrics(model, tokenizer, device, args):
-    if args['verbose']:
-        print('Computing metrics...')
-    test_data = get_just_test_data(args)
-    numbers = []
-    for _, factorization_dict in test_data.items():
-        numbers.append(factorization_dict['number'])
-    if args['verbose']:
-        print('Factoring...')
-    metric_df = form_factor_df(model, tokenizer, device, numbers, args['data']['input_padding'], 
-                               args['data']['max_input_size'], args['data']['max_decode_size'], 
-                               args['metrics']['n_beams'], args['metrics']['max_num'])
-    metric_df.to_csv(args['io']['save_path'] + 'metric_df.csv')
-    metric_df.to_pickle(args['io']['save_path'] + 'metric_df.pkl')
-    if args['verbose']:
-        print('Computing metrics...')
-    metrics = compute_metrics(metric_df)
-    metrics['meta'] = {'n_beams' : args['metrics']['n_beams']}
-    save_json(metrics, args['io']['save_path'] + 'metrics.json')
-
 
 
 def main(args):
+    args = backfill_args(args)
     device = torch.device('cuda')
     tokenizer = Tokenizer()
     args = compute_extra_args(args, tokenizer)
@@ -126,21 +93,28 @@ def main(args):
     args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader)
     os.makedirs(args['io']['save_path'], exist_ok=True)
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
+    if args['verbose']:
+        print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args)
+    best_checkpoint = get_target_checkpoint(args['io']['save_path'])['model_state_dict']
+    model.load_state_dict(best_checkpoint)
     compute_factorization_metrics(model, tokenizer, device, args)
     
     # optimize Decode
-    # In trainig script, before evaluation step, load the best model!
-    
-    # Start tracking experiments!
+    # Make metrics visible in github so expierment notebook will run
+    # Add colab runable notebook
+    # Visualize attention between input/output
+
+
+    # Gradientr clipping? <-- SEEM TO NEED THIS TO TRAIN BIGGER TRANSFORMERS
     # Are there other thingies that folks do with training transformers?
-    # Add ability in config to overwrite directory or not    
     # Get more Data! Also write a script for generating data
-    # Gradientr clipping?
     # Gradient Accumulation
     # That generative transfomrer rnn hybrid from the yannic video whatever it was called
     # File with default arguments. As args change over time, might not have all in config, so need some 
         # defaults to fall back to for evaluation backcompatibiltiy
+    # Some prediction head for whether or not a target # is prime
+    # lower learning rates for bigger models
 
 
 

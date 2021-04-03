@@ -4,17 +4,19 @@ import pandas as pd
 from data_utils import dec2bin, bin2dec, pad_input, FactorizationDataset, gfm
 from Levenshtein import distance as levenshtein_distance
 
+# This function could be optimized a bit. For convineint I create all possible sequences @ each step w/ repeat_interlave, which is n_beams*len(tokenizer) sequences
+# becaue it makes indexing convinient.
+# According to the pytorch memory profiler, this takes about 1/6 of the running time of the total function. 
 def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams):
     sequences = torch.tensor(tokenizer('1')).to(device).unsqueeze(0)
     sequence_log_probs = torch.tensor([[0]]).to(device)
-    stop_char = tokenizer('.')[0]
+    eos_token = tokenizer('.')[0]
     
     for i in range(max_decode_size-1):
         with torch.no_grad():
             output = model.decode(sequences, 
                                   memory.repeat(1,sequences.size(0),1), 
                                   memory_key_padding_mask.repeat(sequences.size(0), 1))[:,-1]
-#                                   memory_key_padding_mask)[:,-1]
             output = torch.log_softmax(output, dim=-1)
         
         # Compue all possible next sequences
@@ -34,7 +36,7 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
             break
 
         # Compute all possible next log probabilities
-        next_token_log_probs[seq_has_eos & ~(next_tokens==tokenizer('_')[0])] = -np.log(10000)
+        next_token_log_probs[seq_has_eos & ~(next_tokens==eos_token)] = -np.log(10000)
         sequence_log_probs = torch.repeat_interleave(sequence_log_probs, len(tokenizer), 0)
         next_sequence_log_probs = sequence_log_probs + next_token_log_probs
         
@@ -46,6 +48,7 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
     sequences = sequences.data.cpu().numpy()
     sequence_log_probs = sequence_log_probs.data.cpu().numpy()
     return sequences, sequence_log_probs
+
 
 
 def compute_full_target_str(base_10_number, input_padding, max_encode_size, max_decode_size):

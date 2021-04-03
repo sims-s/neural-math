@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 import numpy as np
+import pandas as pd
 import yaml
 
 def run_batch(model, batch, tokenizer, loss_func, device, backward=True):
@@ -14,13 +15,15 @@ def run_batch(model, batch, tokenizer, loss_func, device, backward=True):
     return loss.item()
     
 
-def train_for_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device):
+def train_for_epoch(model, opt, scheduler, loader, tokenizer, loss_func, max_grad_norm, device):
     model.train()
     pbar = tqdm(total = len(loader), leave=False)
     loss_hist = [] 
     for i, batch in enumerate(loader):
         model.zero_grad()
         loss = run_batch(model, batch, tokenizer, loss_func, device, backward=True)
+        if max_grad_norm > 0:
+            nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
         opt.step()
         scheduler.step()
         pbar.update(1)
@@ -51,8 +54,9 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
     
     loss_func = nn.CrossEntropyLoss()
     pbar = tqdm(total = args['scheduler']['nb_epochs'], leave=False)
+    loss_hist = []
     for i in range(args['scheduler']['nb_epochs']):
-        train_loss = train_for_epoch(model, optimizer, scheduler, train_loader, tokenizer, loss_func, device)
+        train_loss = train_for_epoch(model, optimizer, scheduler, train_loader, tokenizer, loss_func, args['optimizer']['max_grad_norm'], device)
         test_loss = test_for_epoch(model, test_loader, tokenizer, loss_func, device)
         if args['io']['save_path']:
             torch.save({'model_state_dict' : model.state_dict(), 
@@ -64,8 +68,13 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
                         '%s/%d_%.4f.pt'%(args['io']['save_path'], i, test_loss))
         if args['verbose']:
             tqdm.write('Train: %.6f, Test: %.6f'%(train_loss, test_loss))
+        loss_hist.append([i, train_loss, test_loss])
+        loss_df = pd.DataFrame.from_records(loss_hist, columns = ['epoch', 'train_loss', 'test_loss'])
+        loss_df.to_csv(args['io']['save_path'] + 'loss_hist.csv', index=False)
+        
         pbar.update(1)
     pbar.close()
 
+    
     if args['verbose']:
         print('Finished Training!')

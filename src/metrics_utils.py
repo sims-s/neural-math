@@ -1,7 +1,46 @@
 import pandas as pd
 import numpy as np
 from tqdm.auto import tqdm
+import torch.nn as nn
 from generation_utils import factor
+from utils import load_json, save_json
+from optimization_utils import test_for_epoch
+from data_utils import prepare_dataloader
+import torch.autograd.profiler as profiler
+
+# def test_for_epoch(model, loader, tokenizer, loss_func, device):
+def load_data_file(args):
+    if args['data']['data_loc'].endswith('.json'):
+        return load_json(args['data']['data_loc'])
+    else:
+        return load_json(args['data']['data_loc'] + '2^%d.json'%args['data']['max_pow'])
+
+def get_just_test_data(args):
+    return load_data_file(args)['test']
+
+def compute_factorization_metrics(model, tokenizer, device, args):
+    if args['verbose']:
+        print('Computing metrics...')
+    test_data = get_just_test_data(args)
+    
+    numbers = []
+    for _, factorization_dict in test_data.items():
+        numbers.append(factorization_dict['number'])
+    if args['verbose']:
+        print('Factoring...')
+    metric_df = form_factor_df(model, tokenizer, device, numbers, args['data']['input_padding'], 
+                               args['data']['max_input_size'], args['data']['max_decode_size'], 
+                               args['metrics']['n_beams'], args['metrics']['max_num'])
+    save_suffix = '_%s'%args['metrics']['save_suffix'] if len(args['metrics']['save_suffix']) > 0 else ''
+    metric_df.to_csv(args['io']['save_path'] + 'metric_df%s.csv'%save_suffix)
+    metric_df.to_pickle(args['io']['save_path'] + 'metric_df%s.pkl'%save_suffix)
+    metrics = compute_metrics(metric_df)
+    # Add test loss to metrics
+    loader = prepare_dataloader(test_data, args, **args['loader']['test'])
+    metrics['test_loss'] = test_for_epoch(model, loader, tokenizer, nn.CrossEntropyLoss(), device)
+
+    metrics['meta'] = {'n_beams' : args['metrics']['n_beams']}
+    save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
 
 
 def form_factor_df(model, tokenizer, device, items, input_padding, max_encode_size, max_decode_size, n_beams=1, max_num=-1):

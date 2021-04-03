@@ -2,7 +2,7 @@ import os
 import re
 import numpy as np
 import utils
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 def dec2bin(num):
     return bin(int(num))[2:]
@@ -19,6 +19,15 @@ def binarize_data(data):
     for i, factor_dict in data.items():
         binarized[i] = {'number' : dec2bin(factor_dict['number']), 'factors' : {dec2bin(int(factor)) : qty for factor, qty in factor_dict['factors'].items()}}
     return binarized
+
+
+def prepare_dataloader(data, args, **loader_kwargs):
+    data = binarize_data(data)
+    data = FactorizationDataset(data, args['data']['max_input_size'],
+                                        args['data']['max_decode_size'],
+                                        args['data']['input_padding'])
+    loader = DataLoader(data, **loader_kwargs)
+    return loader
 
 
 def pad_input(input, pad_to, input_padding):
