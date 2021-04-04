@@ -11,6 +11,7 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
     sequences = torch.tensor(tokenizer('1')).to(device).unsqueeze(0)
     sequence_log_probs = torch.tensor([[0]]).to(device)
     eos_token = tokenizer('.')[0]
+    pad_token = tokenizer('_')[0]
     
     for i in range(max_decode_size-1):
         with torch.no_grad():
@@ -29,14 +30,14 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
         # For cases when the model migth predict a non padding token after an end of sequence token
         # Manually set the log probability to be very low so it's never chosen to be decdoed
         # Additionally, break if all sequences have eos tokens
-        seq_has_eos = torch.argmax((sequences==tokenizer('.')[0]).int(), dim=1).view(-1,1) > 0
+        seq_has_eos = torch.argmax((sequences==eos_token).int(), dim=1).view(-1,1) > 0
         if torch.all(seq_has_eos):
             # undo repeat_interleave
             sequences = sequences[::len(tokenizer)]
             break
 
         # Compute all possible next log probabilities
-        next_token_log_probs[seq_has_eos & ~(next_tokens==eos_token)] = -np.log(10000)
+        next_token_log_probs[seq_has_eos & ~(next_tokens==pad_token)] = -np.log(10000)
         sequence_log_probs = torch.repeat_interleave(sequence_log_probs, len(tokenizer), 0)
         next_sequence_log_probs = sequence_log_probs + next_token_log_probs
         

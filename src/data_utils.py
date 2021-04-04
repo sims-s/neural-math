@@ -77,7 +77,7 @@ class GlobalFactorMapping():
             name_pattern = re.compile('2\^\d+')
             files = os.listdir(data_path)
             files = [f for f in files if f.endswith('.json') and name_pattern.search(f)]
-            powers = [f.split('.')[0].split('^')[1] for f in files]
+            powers = [int(f.split('.')[0].split('^')[1]) for f in files]
             best_idx = np.argmax(powers)
             best_path = data_path + files[best_idx]
         

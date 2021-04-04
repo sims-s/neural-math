@@ -17,7 +17,7 @@
   'type' : 'adam'
   'opt_args' : 
     'lr' : 0.001
-  'max_grad_norm' : 1
+  'max_grad_norm' : -1
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
@@ -33,7 +33,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/pad_shared_grad_norm/'
+  'save_path' : './models/double_check_clipping/'
 
 'metrics' : 
   'n_beams' : 2

@@ -32,7 +32,7 @@ def compute_factorization_metrics(model, tokenizer, device, args):
                                args['data']['max_input_size'], args['data']['max_decode_size'], 
                                args['metrics']['n_beams'], args['metrics']['max_num'])
     save_suffix = '_%s'%args['metrics']['save_suffix'] if len(args['metrics']['save_suffix']) > 0 else ''
-    metric_df.to_csv(args['io']['save_path'] + 'metric_df%s.csv'%save_suffix)
+    metric_df.to_csv(args['io']['save_path'] + 'metric_df%s.csv'%save_suffix, index=False)
     metric_df.to_pickle(args['io']['save_path'] + 'metric_df%s.pkl'%save_suffix)
     metrics = compute_metrics(metric_df)
     # Add test loss to metrics

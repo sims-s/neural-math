@@ -101,12 +101,7 @@ def main(args):
     model.load_state_dict(best_checkpoint)
     compute_factorization_metrics(model, tokenizer, device, args)
 
-    # TODAY TODOS:
-    # 1. Make a script that generates data
-    # 2. Make a collab notebook/work tyhrough that whole proces
-    
-    # Make metrics visible in github so expierment notebook will run
-    # Add colab runable notebook
+
     # Visualize attention between input/output
     # Notebook joint variations
     # Do some analysis on why clip grad norm is messing everything up so bad...
