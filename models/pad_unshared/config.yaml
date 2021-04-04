@@ -1,0 +1,40 @@
+data:
+  data_loc: ./data/
+  input_padding: pad
+  max_decode_size: 48
+  max_input_size: 18
+  max_pow: 16
+io:
+  save_path: ./models/pad_unshared/
+loader:
+  test:
+    batch_size: 256
+    shuffle: false
+  train:
+    batch_size: 64
+    shuffle: true
+metrics:
+  max_num: -1
+  n_beams: 2
+  save_suffix: ''
+model_args:
+  dim_feedforward: 128
+  dropout: 0.1
+  embed_dim: 64
+  num_decoder_layers: 6
+  num_encoder_layers: 6
+  scale_embeddings: false
+  shared_embeddings: false
+optimizer:
+  opt_args:
+    lr: 0.001
+  type: adam
+scheduler:
+  n_warmup_steps: 2000
+  nb_epochs: 50
+  nb_steps: 41050
+  type: linear_schedule_with_warmup
+tokenizer:
+  n_tokens: 5
+  pad_token_id: 4
+verbose: true

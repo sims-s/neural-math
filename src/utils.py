@@ -22,6 +22,8 @@ def get_target_checkpoint(path):
     if path.endswith('.pt'):
         chosen_path = path
     else:
+        if not 'checkpoints' in path:
+            path = os.path.join(path, 'checkpoints/')
         files = [f for f in os.listdir(path) if f.endswith('.pt')]
         losses = [float(fname.split('_')[1][:-3]) for fname in files]
         best_loss_idx = np.argmin(losses)

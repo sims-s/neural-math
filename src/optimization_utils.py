@@ -4,6 +4,7 @@ from tqdm.auto import tqdm
 import numpy as np
 import pandas as pd
 import yaml
+import os
 
 def run_batch(model, batch, tokenizer, loss_func, device, backward=True):
     numbers = torch.tensor(tokenizer(batch['number'])).to(device)
@@ -65,7 +66,7 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
                         'test_loss' : test_loss,
                         'args': args, 
                         'epoch' : i},
-                        '%s/%d_%.4f.pt'%(args['io']['save_path'], i, test_loss))
+                        '%s/%d_%.4f.pt'%(os.path.join(args['io']['save_path'], 'checkpoints'), i, test_loss))
         if args['verbose']:
             tqdm.write('Train: %.6f, Test: %.6f'%(train_loss, test_loss))
         loss_hist.append([i, train_loss, test_loss])

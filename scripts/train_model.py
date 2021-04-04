@@ -92,6 +92,7 @@ def main(args):
     train_loader, test_loader = get_datasets(args)
     args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader)
     os.makedirs(args['io']['save_path'], exist_ok=True)
+    os.makedirs(args['io']['save_path'] + 'checkpoints/', exist_ok=True)
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
     if args['verbose']:
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
@@ -99,14 +100,19 @@ def main(args):
     best_checkpoint = get_target_checkpoint(args['io']['save_path'])['model_state_dict']
     model.load_state_dict(best_checkpoint)
     compute_factorization_metrics(model, tokenizer, device, args)
+
+    # TODAY TODOS:
+    # 1. Make a script that generates data
+    # 2. Make a collab notebook/work tyhrough that whole proces
     
-    # optimize Decode
     # Make metrics visible in github so expierment notebook will run
     # Add colab runable notebook
     # Visualize attention between input/output
+    # Notebook joint variations
+
+    
 
 
-    # Gradientr clipping? <-- SEEM TO NEED THIS TO TRAIN BIGGER TRANSFORMERS
     # Are there other thingies that folks do with training transformers?
     # Get more Data! Also write a script for generating data
     # Gradient Accumulation
@@ -115,6 +121,7 @@ def main(args):
         # defaults to fall back to for evaluation backcompatibiltiy
     # Some prediction head for whether or not a target # is prime
     # lower learning rates for bigger models
+    # Other bases???
 
 
 

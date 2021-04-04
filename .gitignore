@@ -1,5 +1,3 @@
 *.pt
 *.pkl
-*.csv
-models/
 notebooks/.ipynb_checkpoints/
