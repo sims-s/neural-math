@@ -25,6 +25,22 @@ def make_data(lb, ub):
     pbar.close()
     return data
 
+def train_test_split(data, train_prob):
+    train_data = {}
+    test_data = {}
+    train_counter = 0
+    test_counter = 0
+
+    np.random.seed(0)
+    for number, factor in data.items():
+        if np.random.rand() < train_prob:
+            train_data[train_counter] = {'number' : number, 'factors' : factor} 
+            train_counter +=1
+        else:
+            test_data[test_counter] = {'number' : number, 'factors' : factor} 
+            test_counter +=1
+    return {'train' : train_data, 'test' : test_data}
+
 def is_pow_of_2(num):
     return np.mod(np.log(num)/np.log(2), 1)==0
 
@@ -44,6 +60,7 @@ def make_save_path(save_dir, lb, ub):
 def main(args):
     lb, ub = get_bounds(args)
     data = make_data(lb, ub)
+    data = train_test_split(data, args.train_prob)
     save_path = make_save_path(args.save_path, lb, ub)
     save_json(data, save_path)
 
@@ -59,6 +76,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_value', type=int, help='max numebr to use', default=-1)
     parser.add_argument('--min_value', type=int, help='min number to use', default=2)
     parser.add_argument('--save_path', type=str, default='data/')
+    parser.add_argument('--train_prob', type=float, default=.8)
 
     args = parser.parse_args()
     main(args)

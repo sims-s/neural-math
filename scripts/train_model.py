@@ -109,6 +109,7 @@ def main(args):
     # Add colab runable notebook
     # Visualize attention between input/output
     # Notebook joint variations
+    # Do some analysis on why clip grad norm is messing everything up so bad...
 
     
 
