@@ -75,19 +75,53 @@ class Factorizer(nn.Module):
         src = self.route_embeddings(src, 'src')
         
         return self.transformer.encoder(src, src_key_padding_mask = src_key_padding_mask), src_key_padding_mask
-    
-    def decode(self, tgt, memory, memory_key_padding_mask):
+
+    def decoder_layer_forward_with_attention(self, layer, tgt, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
+        tgt2 = layer.self_attn(tgt, tgt, tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)[0]
+        tgt = tgt + layer.dropout(tgt2)
+        tgt = layer.norm1(tgt)
+        tgt2, attn = layer.multihead_attn(tgt, memory, memory, key_padding_mask=memory_key_padding_mask)
+        tgt = tgt + layer.dropout2(tgt2)
+        tgt = layer.norm2(tgt)
+        tgt2 = layer.linear2(layer.dropout(layer.activation(layer.linear1(tgt))))
+        tgt = tgt + layer.dropout3(tgt2)
+        tgt = layer.norm3(tgt)
+        return tgt, attn
+
+
+    def decoder_forward_with_attention(self, tgt, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
+        output = tgt
+        attn_list = []
+        for mod in self.transformer.decoder.layers:
+            output, attn = self.decoder_layer_forward_with_attention(mod, output, memory, tgt_mask=tgt_mask, 
+                        tgt_key_padding_mask=tgt_key_padding_mask,
+                        memory_key_padding_mask=memory_key_padding_mask)
+            attn_list.append(attn)
+        if self.transformer.decoder.norm is not None:
+            output = self.transformer.decoder.norm(output)
+        
+        return output, attn_list
+
+    def decode(self, tgt, memory, memory_key_padding_mask, return_enc_dec_attn=False):
         tgt_key_padding_mask = self.form_pad_mask(tgt)
         tgt = self.route_embeddings(tgt, 'tgt')
         
         tgt_mask = self.form_subsequence_mask(tgt)
         
-        output = self.transformer.decoder(tgt, memory, tgt_mask = tgt_mask, 
+        if not return_enc_dec_attn:
+            output = self.transformer.decoder(tgt, memory, tgt_mask = tgt_mask, 
                                           tgt_key_padding_mask = tgt_key_padding_mask,
                                           memory_key_padding_mask = memory_key_padding_mask)
+        else:
+            output, attn_weights = self.decoder_forward_with_attention(tgt, memory, tgt_mask=tgt_mask,
+                                    tgt_key_padding_mask = tgt_key_padding_mask, 
+                                    memory_key_padding_mask = memory_key_padding_mask)
         output = output.transpose(0,1)
         decoded = self.tokens_out(output)
-        return decoded
+        if not return_enc_dec_attn:
+            return decoded
+        else:
+            return decoded, attn_weights
     
         
     def forward(self, src, tgt):

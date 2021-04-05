@@ -36,6 +36,7 @@ def update_args_with_cli(args, input_args):
     args['metrics']['save_suffix'] = input_args.suffix
     if input_args.n_beams > 0:
         args['metrics']['n_beams'] = input_args.n_beams
+    args['io']['save_path'] = input_args.path
     return args
 
 def backfill_args(args):

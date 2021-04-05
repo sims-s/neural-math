@@ -34,7 +34,7 @@ class Tokenizer():
             else:
                 return type(x)([self(seq) for seq in x])
         # single item to decode
-        elif isinstance(x[0], np.integer):
+        elif isinstance(x[0], np.integer) or isinstance(x[0], int):
             return self.decode(x, decode_special)
         # Multipel items to decode, may be list or tensor or who knows
         elif hasattr(x[0], '__iter__'):

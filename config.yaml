@@ -5,10 +5,10 @@
   'input_padding' : 'pad' # either "pad" or "zeros" either represent numbers as "10._" [# + EOS + Pad Token] or "0010" [Leading 0s + #]
 
 'model_args':
-  'embed_dim' : 64
-  'num_encoder_layers' : 6
-  'num_decoder_layers' : 6
-  'dim_feedforward' : 128
+  'embed_dim' : 128
+  'num_encoder_layers' : 10
+  'num_decoder_layers' : 10
+  'dim_feedforward' : 512
   'dropout' : .1
   'shared_embeddings' : True
   'scale_embeddings' : False
@@ -21,8 +21,8 @@
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
-  'n_warmup_steps' : 2000
-  'nb_epochs' : 50
+  'n_warmup_steps' : 10000
+  'nb_epochs' : 200
 
 'loader' :
   'train' : 
@@ -33,7 +33,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/double_check_clipping/'
+  'save_path' : './models/larger_3_longer/'
 
 'metrics' : 
   'n_beams' : 2

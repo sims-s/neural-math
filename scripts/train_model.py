@@ -102,22 +102,23 @@ def main(args):
     compute_factorization_metrics(model, tokenizer, device, args)
 
 
+    ## FEATURES
+    
     # Visualize attention between input/output
     # Notebook joint variations
-    # Do some analysis on why clip grad norm is messing everything up so bad...
 
+    # JUST NEED COMPUTE
+    # Rerun evaluation for things without loss. Also the one with grad norm that's the same as the other base ones to compare
+        #  pad_shared_gradnorm_10_layer
+        #  pad_shared_grad_norm
     
-
-
     # Are there other thingies that folks do with training transformers?
     # Get more Data! Also write a script for generating data
     # Gradient Accumulation
     # That generative transfomrer rnn hybrid from the yannic video whatever it was called
-    # File with default arguments. As args change over time, might not have all in config, so need some 
-        # defaults to fall back to for evaluation backcompatibiltiy
     # Some prediction head for whether or not a target # is prime
     # lower learning rates for bigger models
-    # Other bases???
+    # Other bases
 
 
 
