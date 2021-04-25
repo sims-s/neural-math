@@ -5,7 +5,7 @@ import torch.nn.functional as f
 
 class PositionalEncoding(nn.Module):
     # From: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
-    def __init__(self, d_model, dropout, max_len):
+    def __init__(self, d_model, dropout, max_len, learnable):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -15,18 +15,21 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
+        if learnable:
+            self.pe = nn.Parameter(pe)
+        else:
+            self.register_buffer('pe', pe)
 
     def forward(self, x):
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
     
 class TransformerEmbedding(nn.Module):
-    def __init__(self, n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings):
+    def __init__(self, n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings, learn_positional_encoding):
         super(TransformerEmbedding, self).__init__()
         self.embed_dim = embed_dim
         self.embedding = nn.Embedding(n_tokens, embed_dim)
-        self.pe = PositionalEncoding(embed_dim, dropout, max_decode_size)
+        self.pe = PositionalEncoding(embed_dim, dropout, max_decode_size, learn_positional_encoding)
         self.scale_embeddings = scale_embeddings
         
     def forward(self, x):
@@ -39,17 +42,17 @@ class TransformerEmbedding(nn.Module):
 
 
 class Factorizer(nn.Module):
-    def __init__(self, n_tokens, embed_dim, max_decode_size, shared_embeddings, pad_token_id, scale_embeddings, **kwargs):
+    def __init__(self, n_tokens, embed_dim, max_decode_size, shared_embeddings, pad_token_id, scale_embeddings, learn_positional_encoding, **kwargs):
         super(Factorizer, self).__init__()
         self.shared_embeddings = shared_embeddings
         self.pad_token_id = pad_token_id
 
         dropout = .1 if not 'dropout' in kwargs else kwargs['dropout']
         if not shared_embeddings:
-            self.src_embedding = TransformerEmbedding(n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings)
-            self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings)
+            self.src_embedding = TransformerEmbedding(n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings, learn_positional_encoding)
+            self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings, learn_positional_encoding)
         else:
-            self.embedding = TransformerEmbedding(n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings)
+            self.embedding = TransformerEmbedding(n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings, learn_positional_encoding)
         
         self.transformer = nn.Transformer(d_model = embed_dim, **kwargs)
         

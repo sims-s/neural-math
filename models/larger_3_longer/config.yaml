@@ -26,7 +26,7 @@ model_args:
   scale_embeddings: false
   shared_embeddings: true
 optimizer:
-  max_grad_norm: -1
+  max_grad_norm: 1
   opt_args:
     lr: 0.001
   type: adam

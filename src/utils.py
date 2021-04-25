@@ -37,10 +37,14 @@ def update_args_with_cli(args, input_args):
     if input_args.n_beams > 0:
         args['metrics']['n_beams'] = input_args.n_beams
     args['io']['save_path'] = input_args.path
+    if input_args.data_loc:
+        args['data']['data_loc'] = input_args.data_loc
     return args
 
 def backfill_args(args):
     # Add default arguments for things that werne't features when the model was run
     if not 'max_grad_norm' in args['optimizer']:
-        args['max_grad_norm'] = -1
+        args['optimizer']['max_grad_norm'] = -1
+    if not 'learn_positional_encoding' in args['model_args']:
+        args['model_args']['learn_positional_encoding'] = False
     return args

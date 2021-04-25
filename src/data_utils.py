@@ -70,7 +70,7 @@ class FactorizationDataset(Dataset):
 
 
 class GlobalFactorMapping():
-    def __init__(self, data_path = 'data/'):
+    def __init__(self, data_path = 'data/2^16.json'):
         if data_path.endswith('.json'):
             best_path = data_path
         else:
@@ -110,4 +110,4 @@ class GlobalFactorMapping():
             return None
         return len(factored)==1 and factored[list(factored.keys())[0]]==1
 
-gfm = GlobalFactorMapping()
+gfm = None

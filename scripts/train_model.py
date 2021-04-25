@@ -10,7 +10,8 @@ import sys
 sys.path.append('./src/')
 from utils import save_json, load_json, get_max_input_size, get_max_decode_size
 from tokenizer import Tokenizer
-from data_utils import prepare_dataloader
+import data_utils
+from data_utils import prepare_dataloader, GlobalFactorMapping, gfm
 from models import Factorizer
 from optimization_utils import run_training
 from generation_utils import factor
@@ -89,6 +90,11 @@ def main(args):
     device = torch.device('cuda')
     tokenizer = Tokenizer()
     args = compute_extra_args(args, tokenizer)
+    data_utils.gfm = GlobalFactorMapping(data_path = args['data']['data_loc'] if args['data']['data_loc'].endswith('.json') else \
+                                          args['data']['data_loc'] + '2^%d.json'%args['data']['max_pow'])
+
+
+
     train_loader, test_loader = get_datasets(args)
     args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader)
     os.makedirs(args['io']['save_path'], exist_ok=True)
@@ -104,21 +110,22 @@ def main(args):
 
     ## FEATURES
     
-    # Visualize attention between input/output
-    # Notebook joint variations
+    # Training rework:
+        # Ability to resume training
+        # Checkpoint at not end of epoch
+        # Gradient Accumulation
+        # MAKE IT SO WHEN DATA IS PASSED INTO MODEL, IT'S ONLY PADDED AS MUCH AS IT NEEDS TO BE!!!
 
-    # JUST NEED COMPUTE
-    # Rerun evaluation for things without loss. Also the one with grad norm that's the same as the other base ones to compare
-        #  pad_shared_gradnorm_10_layer
-        #  pad_shared_grad_norm
+    # Other bases... More generally other tokenization methods (e.g. if a number is inputted as 2**123 or other expressions, know how to handle)
+        # I think this might actually be helpful?
+        # Rework tokenizer along with this
     
     # Are there other thingies that folks do with training transformers?
-    # Get more Data! Also write a script for generating data
-    # Gradient Accumulation
-    # That generative transfomrer rnn hybrid from the yannic video whatever it was called
+        # Learned Positional Embeddings
+
     # Some prediction head for whether or not a target # is prime
-    # lower learning rates for bigger models
-    # Other bases
+        # Model is predicting correct product
+    # lower learning rates for bigger models... but not too low ;)
 
 
 
