@@ -11,10 +11,10 @@ sys.path.append('./src/')
 from utils import save_json, load_json, get_max_input_size, get_max_decode_size
 from tokenizer import Tokenizer
 import data_utils
-from data_utils import FactorizationDataset, binarize_data, prepare_dataloader, GlobalFactorMapping, gfm
+from data_utils import FactorizationDataset, convert_base, prepare_dataloader, GlobalFactorMapping, gfm
 from models import Factorizer
 from metrics_utils import compute_factorization_metrics
-from utils import get_target_checkpoint, update_args_with_cli, backfill_args
+from utils import get_best_checkpoint, update_args_with_cli, backfill_args
 
 
 
@@ -52,7 +52,7 @@ def load_model(args, device, state_dict):
 
 
 def main(input_args):
-    checkpoint = get_target_checkpoint(input_args.path)
+    checkpoint = get_best_checkpoint(input_args.path)
     args = checkpoint['args']
     args = backfill_args(args)
     # update the saved arguments incase you want to change stuff (e.g. # beams, etc)
@@ -61,8 +61,7 @@ def main(input_args):
                                           args['data']['data_loc'] + '2^%d.json'%args['data']['max_pow'])
 
     device = torch.device('cuda')
-    tokenizer = Tokenizer()
-    test_loader = get_test_dataset(args)
+    tokenizer = Tokenizer(args['data']['base'])
     model = load_model(args, device, checkpoint['model_state_dict'])
     compute_factorization_metrics(model, tokenizer, device, args)
 

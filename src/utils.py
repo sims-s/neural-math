@@ -15,10 +15,16 @@ def get_max_input_size(max_power, input_padding):
     input_size = max_power + (2 if input_padding=='pad' else 0)
     return input_size
 
-def get_max_decode_size(max_power):
-    return 3*max_power
+def load_data_file(dir_or_path):
+    if dir_or_path.endswith('.json'):
+        return load_json(dir_or_path)
+    else:
+        return load_json(dir_or_path + '2^%d.json'%args['data']['max_pow'])
 
-def get_target_checkpoint(path):
+def get_max_decode_size(max_power):
+    return 3*max_power + 1
+
+def get_best_checkpoint(path):
     if path.endswith('.pt'):
         chosen_path = path
     else:
@@ -43,8 +49,4 @@ def update_args_with_cli(args, input_args):
 
 def backfill_args(args):
     # Add default arguments for things that werne't features when the model was run
-    if not 'max_grad_norm' in args['optimizer']:
-        args['optimizer']['max_grad_norm'] = -1
-    if not 'learn_positional_encoding' in args['model_args']:
-        args['model_args']['learn_positional_encoding'] = False
     return args

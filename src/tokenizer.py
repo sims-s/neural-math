@@ -1,14 +1,18 @@
 import numpy as np
 
 class Tokenizer():
-    def __init__(self):
-        self.token_mapper = {
-            '0' : 0,
-            '1' : 1,
-            'x' : 2, # multiplication
-            '.' : 3, # End of decode
-            '_' : 4, # Padding
-        }
+    def __init__(self, base):
+        digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        token_mapper = {digits[i] : i for i in range(base)}
+        # Make sure start of sequence token is always the last token in the tokenizer
+        # (Needed in generation_utils.decode)
+        token_mapper.update({
+            'x' : base, # multiplication
+            '_' : base+1, #padding,
+            '.' : base+2, # end of sequence
+            '>' : base+3, # start of sequence
+        })
+        self.token_mapper = token_mapper
         self.inverse = {v: k for k,v in self.token_mapper.items()}
         
     def encode(self, seq):

@@ -3,11 +3,12 @@
   'max_pow' : 16 # Data should be in range of [2, ...2**max_pow]. How long the decode sequence should be
   'data_loc' : './data/2^16.json' # Path to data file. Either folder and will auto use the one with the largest exponent formated as "2^x.json" OR a json file
   'input_padding' : 'pad' # either "pad" or "zeros" either represent numbers as "10._" [# + EOS + Pad Token] or "0010" [Leading 0s + #]
+  'base' : 2
 
 'model_args':
-  'embed_dim' : 128
-  'num_encoder_layers' : 6
-  'num_decoder_layers' : 6
+  'embed_dim' : 64
+  'num_encoder_layers' : 4
+  'num_decoder_layers' : 4
   'dim_feedforward' : 128
   'dropout' : .1
   'shared_embeddings' : True
@@ -34,7 +35,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/no_learned_embeddings/'
+  'save_path' : './models/base_2/'
 
 'metrics' : 
   'n_beams' : 2

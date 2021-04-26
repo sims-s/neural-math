@@ -10,7 +10,7 @@ def run_batch(model, batch, tokenizer, loss_func, device, backward=True):
     numbers = torch.tensor(tokenizer(batch['number'])).to(device)
     labels = torch.tensor(tokenizer(batch['label'])).to(device)
     res = model(numbers, labels[:,:-1])
-    loss = loss_func(res.view(-1, 5), labels[:,1:].reshape(-1))
+    loss = loss_func(res.view(-1, len(tokenizer)), labels[:,1:].reshape(-1))
     if backward:
         loss.backward()
     return loss.item()

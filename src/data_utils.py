@@ -4,25 +4,29 @@ import numpy as np
 import utils
 from torch.utils.data import Dataset, DataLoader
 
-def dec2bin(num):
-    return bin(int(num))[2:]
+def dec2base(num, base):
+    return np.base_repr(num, base)
 
-def bin2dec(num):
-    return int(str(num), 2)
+def base2dec(num, base):
+    return int(str(num), base)
 
-def binarize_data(data):
+def convert_base(data, base):
     if 'train' in data:
-        data['train'] = binarize_data(data['train'])
-        data['test'] = binarize_data(data['test'])
+        data['train'] = convert_base(data['train'], base)
+        data['test'] = convert_base(data['test'], base)
         return data
-    binarized = {}
+    converted = {}
     for i, factor_dict in data.items():
-        binarized[i] = {'number' : dec2bin(factor_dict['number']), 'factors' : {dec2bin(int(factor)) : qty for factor, qty in factor_dict['factors'].items()}}
-    return binarized
+        converted[i] = {'number' : dec2base(factor_dict['number'], base), 
+                        'factors' : {
+                            dec2base(int(factor), base) : qty for factor, qty in factor_dict['factors'].items()
+                            }
+                        }
+    return converted
 
 
 def prepare_dataloader(data, args, **loader_kwargs):
-    data = binarize_data(data)
+    data = convert_base(data, args['data']['base'])
     data = FactorizationDataset(data, args['data']['max_input_size'],
                                         args['data']['max_decode_size'],
                                         args['data']['input_padding'])
@@ -54,7 +58,7 @@ class FactorizationDataset(Dataset):
     
     def form_label(self, label):
         factors = sum([[k]*v for k, v in label.items()], [])
-        factors = 'x'.join(factors) + '.'
+        factors = '>' + 'x'.join(factors) + '.'
         n_pad = self.max_decode_size - len(factors)
         factors = factors + '_'*n_pad
         return factors
