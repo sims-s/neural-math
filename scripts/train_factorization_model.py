@@ -21,13 +21,19 @@ from utils import get_best_checkpoint, backfill_args
 
 
 def get_datasets(args):
+    def get_max_val(data_dict):
+        return max([v['number'] for _, v in data_dict.items()])
+
     if args['verbose']:
         print('Loading data...')
     data = load_data_file(args['data']['data_loc'])
 
+    train_max_val, test_max_val = get_max_val(data['train']), get_max_val(data['test'])
+
     
     return prepare_dataloader(data['train'], args, **args['loader']['train']), \
-           prepare_dataloader(data['test'], args, **args['loader']['test'])
+           prepare_dataloader(data['test'], args, **args['loader']['test']), \
+            max(train_max_val, test_max_val)
     
 
 def compute_extra_args(args, tokenizer):
@@ -103,8 +109,8 @@ def main(args):
         # Checkpoint at not end of epoch
         # Gradient Accumulation
         # MAKE IT SO WHEN DATA IS PASSED INTO MODEL, IT'S ONLY PADDED AS MUCH AS IT NEEDS TO BE!!!
-
-    # Go over factor/decoding again to make sure there are no insidious bugs.....
+    
+    # Remove max encode size, max decode size, .... Should just pad up to the length of the batch...... always...... =/
     
 
 if __name__ == "__main__":

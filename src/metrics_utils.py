@@ -97,8 +97,5 @@ def compute_metrics(factor_df):
     })
     metrics['pred_same_as_target_beam_0'].columns = mean_size_product_factorization
     metrics['pred_same_as_target_beam_0'] = metrics['pred_same_as_target_beam_0'].reset_index().to_dict(orient='index')
-
-    import pprint
-    pprint.pprint(metrics['pred_same_as_target_beam_0'])
     
     return metrics

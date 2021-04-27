@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 import sys
 sys.path.append('./src/')
-from utils import save_json, load_json, get_max_input_size, get_max_decode_size
+from utils import save_json, load_json
 from tokenizer import Tokenizer
 import data_utils
 from data_utils import FactorizationDataset, convert_base, prepare_dataloader, GlobalFactorMapping, gfm
