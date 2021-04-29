@@ -8,7 +8,7 @@ from transformers import get_linear_schedule_with_warmup
 
 import sys
 sys.path.append('./src/')
-from utils import save_json, load_json, get_max_input_size, get_max_decode_size, load_data_file
+from utils import save_json, load_json, load_data_file
 from tokenizer import Tokenizer
 import data_utils
 from data_utils import prepare_dataloader, GlobalFactorMapping, gfm
@@ -21,25 +21,16 @@ from utils import get_best_checkpoint, backfill_args
 
 
 def get_datasets(args):
-    def get_max_val(data_dict):
-        return max([v['number'] for _, v in data_dict.items()])
-
     if args['verbose']:
         print('Loading data...')
     data = load_data_file(args['data']['data_loc'])
-
-    train_max_val, test_max_val = get_max_val(data['train']), get_max_val(data['test'])
-
     
     return prepare_dataloader(data['train'], args, **args['loader']['train']), \
-           prepare_dataloader(data['test'], args, **args['loader']['test']), \
-            max(train_max_val, test_max_val)
+           prepare_dataloader(data['test'], args, **args['loader']['test'])
     
 
 def compute_extra_args(args, tokenizer):
-    # Compute input/output sizes given how we're padding things
-    args['data']['max_input_size'] = get_max_input_size(args['data']['max_pow'], args['data']['input_padding'])
-    args['data']['max_decode_size'] = get_max_decode_size(args['data']['max_pow'])
+    # # Compute input/output sizes given how we're padding things
     # Return things related to the tokenizer
     args['tokenizer'] = {}
     args['tokenizer']['n_tokens'] = len(tokenizer)
@@ -50,7 +41,6 @@ def compute_extra_args(args, tokenizer):
 def get_model(args, device):
     model = Factorizer(n_tokens = args['tokenizer']['n_tokens'], 
                         pad_token_id = args['tokenizer']['pad_token_id'],
-                        max_decode_size = args['data']['max_decode_size'],
                          **args['model_args'])
     model.to(device)
     return model
@@ -93,9 +83,12 @@ def main(args):
 
     train_loader, test_loader = get_datasets(args)
     args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader)
+    
     os.makedirs(args['io']['save_path'], exist_ok=True)
     os.makedirs(args['io']['save_path'] + 'checkpoints/', exist_ok=True)
+
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
+
     if args['verbose']:
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args)
@@ -110,7 +103,7 @@ def main(args):
         # Gradient Accumulation
         # MAKE IT SO WHEN DATA IS PASSED INTO MODEL, IT'S ONLY PADDED AS MUCH AS IT NEEDS TO BE!!!
     
-    # Remove max encode size, max decode size, .... Should just pad up to the length of the batch...... always...... =/
+    # When generating predictions, why isn't the end of sequence token returned but the start of sequence on eios?
     
 
 if __name__ == "__main__":

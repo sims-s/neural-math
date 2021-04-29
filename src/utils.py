@@ -11,18 +11,20 @@ def load_json(path):
     with open(path, 'r') as f:
         return json.load(f)
 
+'''
 def get_max_input_size(max_power, input_padding):
     input_size = max_power + (2 if input_padding=='pad' else 0)
     return input_size
+
+def get_max_decode_size(max_power):
+    return 3*max_power + 1
+'''
 
 def load_data_file(dir_or_path):
     if dir_or_path.endswith('.json'):
         return load_json(dir_or_path)
     else:
         return load_json(dir_or_path + '2^%d.json'%args['data']['max_pow'])
-
-def get_max_decode_size(max_power):
-    return 3*max_power + 1
 
 def get_best_checkpoint(path):
     if path.endswith('.pt'):

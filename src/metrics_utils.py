@@ -21,8 +21,7 @@ def compute_factorization_metrics(model, tokenizer, device, args):
         numbers.append(factorization_dict['number'])
     if args['verbose']:
         print('Factoring...')
-    factor_df = form_factor_df(model, tokenizer, device, args['data']['base'], numbers, args['data']['input_padding'], 
-                               args['data']['max_input_size'], args['data']['max_decode_size'], 
+    factor_df = form_factor_df(model, tokenizer, device, args['data']['base'], numbers, args['model_args']['max_decode_size'],
                                args['metrics']['n_beams'], args['metrics']['max_num'])
     save_suffix = '_%s'%args['metrics']['save_suffix'] if len(args['metrics']['save_suffix']) > 0 else ''
     factor_df.to_csv(args['io']['save_path'] + 'factor_df%s.csv'%save_suffix, index=False)
@@ -36,14 +35,14 @@ def compute_factorization_metrics(model, tokenizer, device, args):
     save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
 
 
-def form_factor_df(model, tokenizer, device, base, items, input_padding, max_encode_size, max_decode_size, n_beams=1, max_num=-1):
+def form_factor_df(model, tokenizer, device, base, items, max_decode_size, n_beams=1, max_num=-1):
     rows = []    
     pbar = tqdm(total = min(len(items), max_num) if max_num > 0 else len(items), leave=False)
     for i, num in enumerate(items):
         if max_num > 0 and i >= max_num:
             break
         if num < 2: continue
-        rows.append(factor(num, base, model, tokenizer, device, input_padding, max_encode_size, max_decode_size, n_beams, return_type='dict'))
+        rows.append(factor(num, base, model, tokenizer, device, max_decode_size, n_beams, return_type='dict'))
         pbar.update(1)
     pbar.update(2)
     pbar.close()
@@ -73,7 +72,7 @@ def compute_metrics(factor_df):
     }).astype(float).to_dict()
     
     # Things about the target, we want to take the first one of b/c we're gruping by it. Otherwise, we want all of them as a list
-    grouped_by_num = grouped_by_num.agg({k: 'first' if 'target' in k else list for k in list(factor_df) if not k=='target_num'}).reset_index()
+    grouped_by_num = grouped_by_num.agg({k: 'first' if ('target' in k or 'input' in k) else list for k in list(factor_df) if not k=='target_num'}).reset_index()
     mean_size_product_factorization = ['correct_product_mean', 'correct_product_size', 'correct_factorization_mean', 'correct_factorization_size']
     
     metrics['by_n_target_factors'] = grouped_by_num.groupby('n_target_factors').agg({

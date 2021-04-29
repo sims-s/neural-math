@@ -27,13 +27,11 @@ def convert_base(data, base):
 
 def prepare_dataloader(data, args, **loader_kwargs):
     data = convert_base(data, args['data']['base'])
-    data = FactorizationDataset(data, args['data']['max_input_size'],
-                                        args['data']['max_decode_size'],
-                                        args['data']['input_padding'])
+    data = FactorizationDataset(data)
     loader = DataLoader(data, **loader_kwargs)
     return loader
 
-
+'''THIS FUNCTION SHOULD BECOME PAD_BATCH
 def pad_input(input, pad_to, input_padding):
     n_pad = pad_to - len(input)
     if input_padding=='pad':
@@ -42,13 +40,21 @@ def pad_input(input, pad_to, input_padding):
         return '0'*n_pad + input
     else:
         raise ValueError()
+'''
+
+def form_label(label):
+    factors = sum([[k]*v for k, v in label.items()], [])
+    if not isinstance(factors[0], str):
+        factors = [str(f) for f in factors]
+    factors = '>' + 'x'.join(factors) + '.'
+    return factors
+
+def form_input(number):
+    return number + '.'
 
 class FactorizationDataset(Dataset):
-    def __init__(self, data_dict, max_encode_size, max_decode_size, input_padding):
+    def __init__(self, data_dict):
         self.data_dict = self.keys_to_int(data_dict)
-        self.max_encode_size = max_encode_size
-        self.max_decode_size = max_decode_size
-        self.input_padding = input_padding
 
     def keys_to_int(self, data):
         new_data = {}
@@ -56,18 +62,10 @@ class FactorizationDataset(Dataset):
             new_data[int(k)] = v
         return new_data
     
-    def form_label(self, label):
-        factors = sum([[k]*v for k, v in label.items()], [])
-        factors = '>' + 'x'.join(factors) + '.'
-        n_pad = self.max_decode_size - len(factors)
-        factors = factors + '_'*n_pad
-        return factors
-    
-    
     def __getitem__(self, i):
         number = self.data_dict[i]['number']
         label = self.data_dict[i]['factors']
-        return {'number' : pad_input(number, self.max_encode_size, self.input_padding), 'label' : self.form_label(label)}
+        return {'number' : form_input(number), 'label' : form_label(label)}
         
     def __len__(self):
         return len(self.data_dict)
@@ -78,7 +76,7 @@ class GlobalFactorMapping():
         if data_path.endswith('.json'):
             best_path = data_path
         else:
-            name_pattern = re.compile('2\^\d+')
+            name_pattern = re.compile(r'2\^\d+')
             files = os.listdir(data_path)
             files = [f for f in files if f.endswith('.json') and name_pattern.search(f)]
             powers = [int(f.split('.')[0].split('^')[1]) for f in files]

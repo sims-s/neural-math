@@ -3,8 +3,7 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-# import torch.optim as optim
-# from transformers import get_linear_schedule_with_warmup
+import yaml
 
 import sys
 sys.path.append('./src/')
@@ -35,7 +34,6 @@ def get_test_dataset(args):
 def get_model(args, device):
     model = Factorizer(n_tokens = args['tokenizer']['n_tokens'], 
                         pad_token_id = args['tokenizer']['pad_token_id'],
-                        max_decode_size = args['data']['max_decode_size'],
                          **args['model_args'])
     model.to(device)
     return model
@@ -53,6 +51,9 @@ def load_model(args, device, state_dict):
 
 def main(input_args):
     checkpoint = get_best_checkpoint(input_args.path)
+
+    with open(input_args.path + 'config.yaml', 'r') as f:
+        args = yaml.safe_load(f)
     args = checkpoint['args']
     args = backfill_args(args)
     # update the saved arguments incase you want to change stuff (e.g. # beams, etc)

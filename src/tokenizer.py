@@ -31,6 +31,10 @@ class Tokenizer():
             return self.encode(x)
         # Encode a batch
         elif isinstance(x[0], str):
+            # Pad everything to be the same length first
+            max_len = max([len(y) for y in x])
+            for i in range(len(x)):
+                x[i] = x[i] + '_'*(max_len - len(x[i]))
             # handle numpy array as a special case b/c you can't create an instance of an array using np.ndarray(foo)...
             np_special_case = isinstance(x, np.ndarray)
             if np_special_case:
