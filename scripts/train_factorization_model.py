@@ -91,6 +91,7 @@ def main(args):
 
     if args['verbose']:
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
+        print('Model args: ', args['model_args'])
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args)
     
     best_checkpoint = get_best_checkpoint(args['io']['save_path'])['model_state_dict']
@@ -104,6 +105,7 @@ def main(args):
         # MAKE IT SO WHEN DATA IS PASSED INTO MODEL, IT'S ONLY PADDED AS MUCH AS IT NEEDS TO BE!!!
     
     # When generating predictions, why isn't the end of sequence token returned but the start of sequence on eios?
+    # Softamx Temperature
     
 
 if __name__ == "__main__":

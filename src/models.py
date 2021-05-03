@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as f
+import torch.nn.functional as F
+from attention_utils import MultiheadAttentionAllHeads
 
 class PositionalEncoding(nn.Module):
     # From: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -55,6 +56,11 @@ class Factorizer(nn.Module):
             self.embedding = TransformerEmbedding(n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings, learn_positional_encoding)
         
         self.transformer = nn.Transformer(d_model = embed_dim, **kwargs)
+        num_heads = 8 if not 'num_heads' in kwargs else kwargs['num_heads']
+        dropout = .1 if not 'dropout' in kwargs else kwargs['dropout']
+        for i in range(self.transformer.decoder.num_layers):
+            self.transformer.decoder.layers[i].self_attn = MultiheadAttentionAllHeads(embed_dim, num_heads, dropout)
+            self.transformer.decoder.layers[i].multihead_attn = MultiheadAttentionAllHeads(embed_dim, num_heads, dropout)
         
         self.tokens_out = nn.Linear(embed_dim, n_tokens)
         
@@ -80,30 +86,33 @@ class Factorizer(nn.Module):
         return self.transformer.encoder(src, src_key_padding_mask = src_key_padding_mask), src_key_padding_mask
 
     def decoder_layer_forward_with_attention(self, layer, tgt, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
-        tgt2 = layer.self_attn(tgt, tgt, tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)[0]
+        tgt2, self_attn = layer.self_attn(tgt, tgt, tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)
         tgt = tgt + layer.dropout(tgt2)
         tgt = layer.norm1(tgt)
-        tgt2, attn = layer.multihead_attn(tgt, memory, memory, key_padding_mask=memory_key_padding_mask)
+        tgt2, mem_attn = layer.multihead_attn(tgt, memory, memory, key_padding_mask=memory_key_padding_mask)
         tgt = tgt + layer.dropout2(tgt2)
         tgt = layer.norm2(tgt)
         tgt2 = layer.linear2(layer.dropout(layer.activation(layer.linear1(tgt))))
         tgt = tgt + layer.dropout3(tgt2)
         tgt = layer.norm3(tgt)
-        return tgt, attn
+        return tgt, mem_attn, self_attn
 
 
     def decoder_forward_with_attention(self, tgt, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
         output = tgt
-        attn_list = []
+        mem_attn_list = []
+        self_attn_list = []
         for mod in self.transformer.decoder.layers:
-            output, attn = self.decoder_layer_forward_with_attention(mod, output, memory, tgt_mask=tgt_mask, 
+            output, mem_attn, self_attn = self.decoder_layer_forward_with_attention(mod, output, memory, tgt_mask=tgt_mask, 
                         tgt_key_padding_mask=tgt_key_padding_mask,
                         memory_key_padding_mask=memory_key_padding_mask)
-            attn_list.append(attn)
+            mem_attn_list.append(mem_attn)
+            self_attn_list.append(self_attn)
+
         if self.transformer.decoder.norm is not None:
             output = self.transformer.decoder.norm(output)
         
-        return output, attn_list
+        return output, torch.cat(mem_attn_list), torch.cat(self_attn_list)
 
     def decode(self, tgt, memory, memory_key_padding_mask, return_enc_dec_attn=False):
         tgt_key_padding_mask = self.form_pad_mask(tgt)
@@ -116,7 +125,7 @@ class Factorizer(nn.Module):
                                           tgt_key_padding_mask = tgt_key_padding_mask,
                                           memory_key_padding_mask = memory_key_padding_mask)
         else:
-            output, attn_weights = self.decoder_forward_with_attention(tgt, memory, tgt_mask=tgt_mask,
+            output, mem_attn, self_attn = self.decoder_forward_with_attention(tgt, memory, tgt_mask=tgt_mask,
                                     tgt_key_padding_mask = tgt_key_padding_mask, 
                                     memory_key_padding_mask = memory_key_padding_mask)
         output = output.transpose(0,1)
@@ -124,7 +133,7 @@ class Factorizer(nn.Module):
         if not return_enc_dec_attn:
             return decoded
         else:
-            return decoded, attn_weights
+            return decoded, mem_attn, self_attn
     
         
     def forward(self, src, tgt):

@@ -53,15 +53,21 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
     sequence_log_probs = sequence_log_probs.data.cpu().numpy()
     return sequences, sequence_log_probs
 
+def compute_target_str(base_10_number, base):
+    factors = data_utils.gfm[base_10_number]
+    based_factors = {}
+    for factor, qty in factors.items():
+        based_factors[dec2base(factor, base)] = qty
+    return data_utils.form_label(based_factors)
         
 def postprocess(factor_list, log_prob, base_10_number, number, base, beam_idx, tokenizer):
-    tokenized = tokenizer(factor_list)
+    tokenized = tokenizer(factor_list, decode_special=True)
     
     information = {
         'target_num' : base_10_number,
         'target_is_prime' : data_utils.gfm.is_prime(base_10_number),
         'input_string' : dec2base(base_10_number, base),
-        'target_str' : data_utils.form_label(data_utils.gfm[base_10_number]),
+        'target_str' : compute_target_str(base_10_number, base),
         'target_factor_list' : sum([[k]*v for k, v in data_utils.gfm[base_10_number].items()], []),
         'pred_str' : ''.join(tokenized),
         'beam_idx' : beam_idx,
@@ -70,7 +76,7 @@ def postprocess(factor_list, log_prob, base_10_number, number, base, beam_idx, t
     information['n_target_factors'] = len(information['target_factor_list'])
     information['pred_same_as_target'] = information['input_string']==information['pred_str'][1:]
     
-    factor_list = tokenized[1:].split('x')
+    factor_list = tokenized[1:-1].split('x')
     try:
         factors = [base2dec(num, base) for num in factor_list]
     except ValueError:

@@ -44,8 +44,6 @@ def pad_input(input, pad_to, input_padding):
 
 def form_label(label):
     factors = sum([[k]*v for k, v in label.items()], [])
-    if not isinstance(factors[0], str):
-        factors = [str(f) for f in factors]
     factors = '>' + 'x'.join(factors) + '.'
     return factors
 
@@ -109,6 +107,7 @@ class GlobalFactorMapping():
         try:
             factored = self[num]
         except KeyError:
+            print(num)
             return None
         return len(factored)==1 and factored[list(factored.keys())[0]]==1
 
