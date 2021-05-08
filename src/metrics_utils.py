@@ -22,7 +22,7 @@ def compute_factorization_metrics(model, tokenizer, device, args):
     if args['verbose']:
         print('Factoring...')
     factor_df = form_factor_df(model, tokenizer, device, args['data']['base'], numbers, args['model_args']['max_decode_size'],
-                               args['metrics']['n_beams'], args['metrics']['max_num'])
+                               args['metrics']['n_beams'], args['metrics']['temperature'], args['metrics']['max_num'])
     save_suffix = '_%s'%args['metrics']['save_suffix'] if len(args['metrics']['save_suffix']) > 0 else ''
     factor_df.to_csv(args['io']['save_path'] + 'factor_df%s.csv'%save_suffix, index=False)
     factor_df.to_pickle(args['io']['save_path'] + 'factor_df%s.pkl'%save_suffix)
@@ -31,18 +31,18 @@ def compute_factorization_metrics(model, tokenizer, device, args):
     loader = prepare_dataloader(test_data, args, **args['loader']['test'])
     metrics['test_loss'] = test_for_epoch(model, loader, tokenizer, nn.CrossEntropyLoss(), device)
 
-    metrics['meta'] = {'n_beams' : args['metrics']['n_beams']}
+    metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
     save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
 
 
-def form_factor_df(model, tokenizer, device, base, items, max_decode_size, n_beams=1, max_num=-1):
+def form_factor_df(model, tokenizer, device, base, items, max_decode_size, n_beams=1, temperature=1.0, max_num=-1):
     rows = []    
     pbar = tqdm(total = min(len(items), max_num) if max_num > 0 else len(items), leave=False)
     for i, num in enumerate(items):
         if max_num > 0 and i >= max_num:
             break
         if num < 2: continue
-        rows.append(factor(num, base, model, tokenizer, device, max_decode_size, n_beams, return_type='dict'))
+        rows.append(factor(num, base, model, tokenizer, device, max_decode_size, n_beams, temperature, return_type='dict'))
         pbar.update(1)
     pbar.update(2)
     pbar.close()

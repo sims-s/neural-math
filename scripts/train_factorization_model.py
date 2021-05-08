@@ -102,11 +102,10 @@ def main(args):
         # Ability to resume training
         # Checkpoint at not end of epoch
         # Gradient Accumulation
-        # MAKE IT SO WHEN DATA IS PASSED INTO MODEL, IT'S ONLY PADDED AS MUCH AS IT NEEDS TO BE!!!
-    
-    # When generating predictions, why isn't the end of sequence token returned but the start of sequence on eios?
-    # Softamx Temperature
-    
+    ``
+    # Why are real tokens predicted after padding? That shoulda been shut down.... FIx that bug!!
+
+    # Scale up to generalized bases
 
 if __name__ == "__main__":
     parser = ArgumentParser()

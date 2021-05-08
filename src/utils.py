@@ -47,8 +47,11 @@ def update_args_with_cli(args, input_args):
     args['io']['save_path'] = input_args.path
     if input_args.data_loc:
         args['data']['data_loc'] = input_args.data_loc
+    if input_args.temperature > 0:
+        args['metrics']['temperature'] = input_args.temperature
     return args
 
 def backfill_args(args):
     # Add default arguments for things that werne't features when the model was run
+    args['metrics']['temperature'] = 1
     return args

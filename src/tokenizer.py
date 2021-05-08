@@ -22,7 +22,10 @@ class Tokenizer():
         full = ''.join([self.inverse[int(t)] for t in seq])
         if decode_special:
             return full
-        return full.replace('.', '').replace('_', '').replace('<','')
+        return self.drop_special(full)
+
+    def drop_special(self, string):
+        return string.replace('.', '').replace('_', '').replace('>', '')
     
     # picks encode/decode and handles batch/single based on types
     def __call__(self, x, decode_special=False):

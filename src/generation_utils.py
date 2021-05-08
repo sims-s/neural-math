@@ -7,7 +7,7 @@ from Levenshtein import distance as levenshtein_distance
 
 
 
-def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams):
+def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams, temperature):
     sequences = torch.tensor(tokenizer('>')).to(device).unsqueeze(0)
     sequence_log_probs = torch.tensor([[0]]).to(device)
     eos_token = tokenizer('.')[0]
@@ -23,8 +23,7 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
                                   memory_key_padding_mask.repeat(sequences.size(0), 1))
             # Last timestep, ignore the start of sequence token b/c we never wanna predict it
             output = output[:,-1,:-1]
-            output = torch.log_softmax(output, dim=-1)
-        
+            output = torch.log_softmax(output / temperature, dim=-1)
         # Compue all possible next sequences
         # sequences = torch.repeat_interleave(sequences, len(tokenizer), 0)
         next_tokens = torch.arange(n_valid_decode_tokens).repeat(output.size(0)).unsqueeze(1).to(sequences.device)
@@ -74,9 +73,9 @@ def postprocess(factor_list, log_prob, base_10_number, number, base, beam_idx, t
         'log_prob' : log_prob.item(),
     }
     information['n_target_factors'] = len(information['target_factor_list'])
-    information['pred_same_as_target'] = information['input_string']==information['pred_str'][1:]
+    information['pred_same_as_target'] = tokenizer.drop_special(information['input_string'])==tokenizer.drop_special(information['pred_str'])
     
-    factor_list = tokenized[1:-1].split('x')
+    factor_list = information['pred_str'].replace('>', '').replace('_', '').replace('.', '').split('x')
     try:
         factors = [base2dec(num, base) for num in factor_list]
     except ValueError:
@@ -98,7 +97,7 @@ def postprocess(factor_list, log_prob, base_10_number, number, base, beam_idx, t
     
 
         
-def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, return_type='df'):
+def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, temperature=1.0, return_type='df'):
     base_10_num = number
     model.eval()
     
@@ -110,7 +109,7 @@ def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, r
     with torch.no_grad():
         memory, memory_key_padding_mask = model.encode(number)
     # Decode!
-    factors_list, log_probs = decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams)
+    factors_list, log_probs = decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams, temperature)
     number = number.data.cpu().numpy()[0]
     to_return = []
     for i in range(len(factors_list)):

@@ -41,6 +41,6 @@
   'n_beams' : 2
   'max_num' : 1000
   'save_suffix' : ''
-
+  'temperature' : 1.0
 
 'verbose' : True

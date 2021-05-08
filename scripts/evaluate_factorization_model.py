@@ -76,6 +76,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_num', default=-1, type=int)
     parser.add_argument('--suffix', default='', type=str)
     parser.add_argument('--n_beams', default=-1, type=int)
+    parser.add_argument('--temperature', default=-1, type=float)
     parser.add_argument('--data_loc', default='', type=str)
     args = parser.parse_args()
     main(args)
