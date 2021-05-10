@@ -1,0 +1,42 @@
+data:
+  base: 210
+  data_loc: ./data/2^16.json
+  max_pow: 16
+io:
+  save_path: ./models/base_210/
+loader:
+  test:
+    batch_size: 256
+    shuffle: false
+  train:
+    batch_size: 64
+    shuffle: true
+metrics:
+  max_num: -1
+  n_beams: 2
+  save_suffix: ''
+  temperature: 1.0
+model_args:
+  dim_feedforward: 512
+  dropout: 0.05
+  embed_dim: 128
+  learn_positional_encoding: false
+  max_decode_size: 64
+  num_decoder_layers: 6
+  num_encoder_layers: 6
+  scale_embeddings: false
+  shared_embeddings: true
+optimizer:
+  max_grad_norm: 1
+  opt_args:
+    lr: 0.001
+  type: adam
+scheduler:
+  n_warmup_steps: 10000
+  nb_epochs: 200
+  nb_steps: 164200
+  type: linear_schedule_with_warmup
+tokenizer:
+  n_tokens: 214
+  pad_token_id: 211
+verbose: true

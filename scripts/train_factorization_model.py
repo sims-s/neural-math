@@ -34,7 +34,7 @@ def compute_extra_args(args, tokenizer):
     # Return things related to the tokenizer
     args['tokenizer'] = {}
     args['tokenizer']['n_tokens'] = len(tokenizer)
-    args['tokenizer']['pad_token_id'] = tokenizer('_')[0]
+    args['tokenizer']['pad_token_id'] = tokenizer.encode('_')[0]
     return args
 
 
@@ -92,6 +92,7 @@ def main(args):
     if args['verbose']:
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
         print('Model args: ', args['model_args'])
+
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args)
     
     best_checkpoint = get_best_checkpoint(args['io']['save_path'])['model_state_dict']
@@ -102,7 +103,7 @@ def main(args):
         # Ability to resume training
         # Checkpoint at not end of epoch
         # Gradient Accumulation
-    ``
+    
     # Why are real tokens predicted after padding? That shoulda been shut down.... FIx that bug!!
 
     # Scale up to generalized bases

@@ -4,11 +4,23 @@ import numpy as np
 import utils
 from torch.utils.data import Dataset, DataLoader
 
-def dec2base(num, base):
-    return np.base_repr(num, base)
+
+def dec2base(n, b):
+    if n == 0:
+        return [0]
+    digits = []
+    while n:
+        digits.append(int(n % b))
+        n //= b
+    return digits[::-1]
 
 def base2dec(num, base):
-    return int(str(num), base)
+    total = 0
+    for i, digit in enumerate(num[::-1]):
+        if digit >= base:
+            raise ValueError('Found token %d when trying to decode from base %d'%(digit, base))
+        total += digit * (base ** i)
+    return total
 
 def convert_base(data, base):
     if 'train' in data:
@@ -19,8 +31,11 @@ def convert_base(data, base):
     for i, factor_dict in data.items():
         converted[i] = {'number' : dec2base(factor_dict['number'], base), 
                         'factors' : {
-                            dec2base(int(factor), base) : qty for factor, qty in factor_dict['factors'].items()
-                            }
+                            i : {
+                                    'tokens' : dec2base(int(factor), base),
+                                    'qty' : qty,
+                                }
+                                for i, (factor, qty) in enumerate(factor_dict['factors'].items())}
                         }
     return converted
 
@@ -28,27 +43,21 @@ def convert_base(data, base):
 def prepare_dataloader(data, args, **loader_kwargs):
     data = convert_base(data, args['data']['base'])
     data = FactorizationDataset(data)
-    loader = DataLoader(data, **loader_kwargs)
+    loader = DataLoader(data, collate_fn = lambda x: {
+        'number': [y['number'] for y in x], 
+        'label' : [y['label'] for y in x]}, 
+        **loader_kwargs)
     return loader
 
-'''THIS FUNCTION SHOULD BECOME PAD_BATCH
-def pad_input(input, pad_to, input_padding):
-    n_pad = pad_to - len(input)
-    if input_padding=='pad':
-        return input + '.' + '_'*n_pad
-    elif input_padding=='zeros':
-        return '0'*n_pad + input
-    else:
-        raise ValueError()
-'''
-
 def form_label(label):
-    factors = sum([[k]*v for k, v in label.items()], [])
-    factors = '>' + 'x'.join(factors) + '.'
+    to_join = []
+    for _, factor_dict in label.items():
+        to_join.append(utils.list_join([factor_dict['tokens']] * factor_dict['qty'], 'x'))
+    factors = ['>'] + utils.list_join(to_join, 'x') + ['.']
     return factors
 
 def form_input(number):
-    return number + '.'
+    return ['>'] + number + ['.']
 
 class FactorizationDataset(Dataset):
     def __init__(self, data_dict):
@@ -107,7 +116,6 @@ class GlobalFactorMapping():
         try:
             factored = self[num]
         except KeyError:
-            print(num)
             return None
         return len(factored)==1 and factored[list(factored.keys())[0]]==1
 

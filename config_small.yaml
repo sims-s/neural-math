@@ -35,7 +35,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/debugging_test/'
+  'save_path' : './models/update_tokenizer/'
 
 'metrics' : 
   'n_beams' : 2

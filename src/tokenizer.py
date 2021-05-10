@@ -1,9 +1,10 @@
 import numpy as np
+from utils import drop_from_iterable
+
 
 class Tokenizer():
     def __init__(self, base):
-        digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        token_mapper = {digits[i] : i for i in range(base)}
+        token_mapper = {str(i):i for i in range(base)}
         # Make sure start of sequence token is always the last token in the tokenizer
         # (Needed in generation_utils.decode)
         token_mapper.update({
@@ -15,45 +16,44 @@ class Tokenizer():
         self.token_mapper = token_mapper
         self.inverse = {v: k for k,v in self.token_mapper.items()}
         
-    def encode(self, seq):
-        return [self.token_mapper[c] for c in seq]
+    def encode_single(self, seq):
+        return [self.token_mapper[str(c)] for c in seq]
     
-    def decode(self, seq, decode_special=False):
-        full = ''.join([self.inverse[int(t)] for t in seq])
+    def decode_single(self, seq, decode_special=False):
+        full = ' '.join([self.inverse[int(t)] for t in seq])
         if decode_special:
             return full
         return self.drop_special(full)
 
     def drop_special(self, string):
-        return string.replace('.', '').replace('_', '').replace('>', '')
+        return drop_from_iterable(string, ['.', '_', '>'])
+
+
+    def encode(self, seq_or_batch):
+        # Encoding a batch
+        if hasattr(seq_or_batch[0], '__iter__') and not isinstance(seq_or_batch[0], str):
+            max_len = max([len(y) for y in seq_or_batch])
+            for i in range(len(seq_or_batch)):
+                seq_or_batch[i] = seq_or_batch[i] + ['_']*(max_len - len(seq_or_batch[i]))
+            np_special_case = isinstance(seq_or_batch, np.ndarray)
+            if np_special_case:
+                return np.array([self.encode_single(seq) for seq in seq_or_batch])
+            else:
+                return type(seq_or_batch)([self.encode_single(seq) for seq in seq_or_batch])
+        # Encoding a single item
+        else:
+            return self.encode_single(seq_or_batch)
+
+    def decode(self, seq_or_batch, decode_special=False):
+        if hasattr(seq_or_batch[0], '__iter__'):
+            np_special_case = isinstance(seq_or_batch, np.ndarray)
+            if np_special_case:
+                return np.array([self.decode_single(seq, decode_special) for seq in seq_or_batch])
+            else:
+                return type(seq_or_batch)([self.decode_single(seq) for seq in seq_or_batch])
+        else:
+            return self.decode_single(seq_or_batch, decode_special)
     
-    # picks encode/decode and handles batch/single based on types
-    def __call__(self, x, decode_special=False):
-        # Just encode a single item
-        if isinstance(x, str):
-            return self.encode(x)
-        # Encode a batch
-        elif isinstance(x[0], str):
-            # Pad everything to be the same length first
-            max_len = max([len(y) for y in x])
-            for i in range(len(x)):
-                x[i] = x[i] + '_'*(max_len - len(x[i]))
-            # handle numpy array as a special case b/c you can't create an instance of an array using np.ndarray(foo)...
-            np_special_case = isinstance(x, np.ndarray)
-            if np_special_case:
-                return np.array([self(seq) for seq in x])
-            else:
-                return type(x)([self(seq) for seq in x])
-        # single item to decode
-        elif isinstance(x[0], np.integer) or isinstance(x[0], int):
-            return self.decode(x, decode_special)
-        # Multipel items to decode, may be list or tensor or who knows
-        elif hasattr(x[0], '__iter__'):
-            np_special_case = isinstance(x, np.ndarray)
-            if np_special_case:
-                return np.array([self(seq, decode_special) for seq in x])
-            else:
-                return type(x)([self(seq, decode_special) for seq in x])
     def __len__(self):
         return len(self.token_mapper)
             

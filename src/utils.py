@@ -11,14 +11,23 @@ def load_json(path):
     with open(path, 'r') as f:
         return json.load(f)
 
-'''
-def get_max_input_size(max_power, input_padding):
-    input_size = max_power + (2 if input_padding=='pad' else 0)
-    return input_size
+def list_join(lst, join_with):
+    joined = []
+    for i, item in enumerate(lst):
+        joined += item
+        if not i==len(lst)-1:
+            joined += [join_with]
+    return joined
 
-def get_max_decode_size(max_power):
-    return 3*max_power + 1
-'''
+
+def drop_from_iterable(lst, drop_elements):
+    if isinstance(drop_elements, type(lst[0])):
+        drop_elements = set(list(drop_elements))
+    elif isinstance(drop_elements, list):
+        drop_elements = set(drop_elements)
+    
+    return [x for x in lst if not x in drop_elements]
+
 
 def load_data_file(dir_or_path):
     if dir_or_path.endswith('.json'):

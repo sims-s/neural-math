@@ -2,16 +2,17 @@ import numpy as np
 import torch
 import pandas as pd
 import data_utils
+import utils
 from data_utils import dec2base, base2dec, FactorizationDataset
 from Levenshtein import distance as levenshtein_distance
 
 
 
 def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams, temperature):
-    sequences = torch.tensor(tokenizer('>')).to(device).unsqueeze(0)
+    sequences = torch.tensor(tokenizer.encode('>')).to(device).unsqueeze(0)
     sequence_log_probs = torch.tensor([[0]]).to(device)
-    eos_token = tokenizer('.')[0]
-    pad_token = tokenizer('_')[0]
+    eos_token = tokenizer.encode('.')[0]
+    pad_token = tokenizer.encode('_')[0]
 
     # Never decode start of sqeuence token
     n_valid_decode_tokens = len(tokenizer)-1
@@ -53,31 +54,56 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
     return sequences, sequence_log_probs
 
 def compute_target_str(base_10_number, base):
-    factors = data_utils.gfm[base_10_number]
-    based_factors = {}
-    for factor, qty in factors.items():
-        based_factors[dec2base(factor, base)] = qty
-    return data_utils.form_label(based_factors)
+    factors = data_utils.convert_base({0:{'number' : base_10_number, 'factors' : data_utils.gfm[base_10_number]}}, base)[0]['factors']
+    return data_utils.form_label(factors)
+
+
+# def strip_lead_trail_spaces(factor_list):
+#     first_real_idx = 0
+#     last_real_idx = len(factor_list)-1
+#     while factor_list[first_real_idx]==' ':
+#         first_real_idx +=1
+#     while factor_list[last_real_idx]==' ':
+#         last_real_idx -= 1
+#     return factor_list[first_real_idx:last_real_idx+1]
+
+def extract_factors(factor_list):
+    # factor_list = strip_lead_trail_spaces(factor_list)
+    chunked = []
+    chunk_start_idx = 0
+    for i, token in enumerate(factor_list):
+        if token=='x' or token =='.':
+            chunked.append(factor_list[chunk_start_idx:i])
+            chunk_start_idx = i + 1
+        elif i==len(factor_list)-1:
+            chunked.append(factor_list[chunk_start_idx:i+1])
+    # print(factor_list)
+    # print(chunked)
+    return chunked
+    
+            
         
 def postprocess(factor_list, log_prob, base_10_number, number, base, beam_idx, tokenizer):
-    tokenized = tokenizer(factor_list, decode_special=True)
-    
+    tokenized = tokenizer.decode(factor_list, decode_special=True)
+
     information = {
         'target_num' : base_10_number,
         'target_is_prime' : data_utils.gfm.is_prime(base_10_number),
         'input_string' : dec2base(base_10_number, base),
         'target_str' : compute_target_str(base_10_number, base),
         'target_factor_list' : sum([[k]*v for k, v in data_utils.gfm[base_10_number].items()], []),
-        'pred_str' : ''.join(tokenized),
+        'pred_list' : factor_list.tolist(),
+        'pred_str' : tokenized,
         'beam_idx' : beam_idx,
         'log_prob' : log_prob.item(),
     }
     information['n_target_factors'] = len(information['target_factor_list'])
-    information['pred_same_as_target'] = tokenizer.drop_special(information['input_string'])==tokenizer.drop_special(information['pred_str'])
+    factor_list = utils.drop_from_iterable(tokenized.split(' '), ['>', '_', '.'])
+    # print(factor_list)
+    factor_list = extract_factors(factor_list)
     
-    factor_list = information['pred_str'].replace('>', '').replace('_', '').replace('.', '').split('x')
     try:
-        factors = [base2dec(num, base) for num in factor_list]
+        factors = [base2dec([int(digit) for digit in num], base) for num in factor_list]
     except ValueError:
         factors = []
     
@@ -92,7 +118,9 @@ def postprocess(factor_list, log_prob, base_10_number, number, base, beam_idx, t
     
     information['num_prime_factors_pred'] = np.sum([data_utils.gfm.is_prime(f) for f in factors if f in data_utils.gfm])
     information['percent_prime_factors_pred'] = information['num_prime_factors_pred'] / information['n_pred_factors']
-    
+
+    information['pred_same_as_target'] = len(information['target_factor_list'])==1 and information['target_factor_list']==information['pred_factor_list']
+
     return information
     
 
@@ -103,7 +131,7 @@ def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, t
     
     # Conver the number to a tensor
     number = dec2base(number, base)
-    number = tokenizer(data_utils.form_input(number))
+    number = tokenizer.encode(data_utils.form_input(number))
     number = torch.tensor(number).unsqueeze(0).to(device)
     # Encode the number
     with torch.no_grad():
