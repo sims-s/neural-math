@@ -55,20 +55,9 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
 
 def compute_target_str(base_10_number, base):
     factors = data_utils.convert_base({0:{'number' : base_10_number, 'factors' : data_utils.gfm[base_10_number]}}, base)[0]['factors']
-    return data_utils.form_label(factors)
-
-
-# def strip_lead_trail_spaces(factor_list):
-#     first_real_idx = 0
-#     last_real_idx = len(factor_list)-1
-#     while factor_list[first_real_idx]==' ':
-#         first_real_idx +=1
-#     while factor_list[last_real_idx]==' ':
-#         last_real_idx -= 1
-#     return factor_list[first_real_idx:last_real_idx+1]
+    return [str(token) for token in data_utils.form_label(factors)]
 
 def extract_factors(factor_list):
-    # factor_list = strip_lead_trail_spaces(factor_list)
     chunked = []
     chunk_start_idx = 0
     for i, token in enumerate(factor_list):
@@ -77,55 +66,60 @@ def extract_factors(factor_list):
             chunk_start_idx = i + 1
         elif i==len(factor_list)-1:
             chunked.append(factor_list[chunk_start_idx:i+1])
-    # print(factor_list)
-    # print(chunked)
     return chunked
     
             
         
-def postprocess(factor_list, log_prob, base_10_number, number, base, beam_idx, tokenizer):
-    tokenized = tokenizer.decode(factor_list, decode_special=True)
-
+def postprocess(factor_list, log_prob, base_10_number, base, beam_idx, tokenizer, postprocess_minimal):
     information = {
         'target_num' : base_10_number,
-        'target_is_prime' : data_utils.gfm.is_prime(base_10_number),
-        'input_string' : dec2base(base_10_number, base),
-        'target_str' : compute_target_str(base_10_number, base),
-        'target_factor_list' : sum([[k]*v for k, v in data_utils.gfm[base_10_number].items()], []),
-        'pred_list' : factor_list.tolist(),
-        'pred_str' : tokenized,
         'beam_idx' : beam_idx,
         'log_prob' : log_prob.item(),
     }
-    information['n_target_factors'] = len(information['target_factor_list'])
+
+    tokenized = tokenizer.decode(factor_list, decode_special=True)
     factor_list = utils.drop_from_iterable(tokenized.split(' '), ['>', '_', '.'])
-    # print(factor_list)
     factor_list = extract_factors(factor_list)
-    
+
     try:
         factors = [base2dec([int(digit) for digit in num], base) for num in factor_list]
     except ValueError:
         factors = []
-    
     information['pred_factor_list'] = factors
-    information['n_pred_factors'] = len(information['pred_factor_list'])
+
     if len(information['pred_factor_list']) > 0:
         information['product'] = np.prod(factors)
     else:
         information['product'] = np.nan
+
     information['correct_product'] = information['product']==base_10_number
     information['correct_factorization'] = information['correct_product'] & all([data_utils.gfm.is_prime(n) for n in information['pred_factor_list']])
-    
-    information['num_prime_factors_pred'] = np.sum([data_utils.gfm.is_prime(f) for f in factors if f in data_utils.gfm])
-    information['percent_prime_factors_pred'] = information['num_prime_factors_pred'] / information['n_pred_factors']
 
-    information['pred_same_as_target'] = len(information['target_factor_list'])==1 and information['target_factor_list']==information['pred_factor_list']
+
+    if not postprocess_minimal:
+        information['target_is_prime'] = data_utils.gfm.is_prime(base_10_number)
+        information['input_string'] = dec2base(base_10_number, base)
+        information['pred_list'] = factor_list
+        information['pred_str'] = tokenized
+        try:
+            information['target_str'] = ' '.join(compute_target_str(base_10_number, base))
+            information['target_factor_list'] = sum([[k]*v for k, v in data_utils.gfm[base_10_number].items()], [])
+        except KeyError:
+            information['target_str'] = ''
+            information['target_factor_list'] = ''
+        information['n_target_factors'] = len(information['target_factor_list'])
+
+        information['n_pred_factors'] = len(information['pred_factor_list'])
+        
+        
+        information['num_prime_factors_pred'] = np.sum([data_utils.gfm.is_prime(f) for f in factors if f in data_utils.gfm])
+        information['percent_prime_factors_pred'] = information['num_prime_factors_pred'] / information['n_pred_factors']
+
+        information['pred_same_as_target'] = len(information['target_factor_list'])==1 and information['target_factor_list']==information['pred_factor_list']
 
     return information
-    
-
         
-def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, temperature=1.0, return_type='df'):
+def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, temperature=1.0, return_type='df', postprocess_minimal=False):
     base_10_num = number
     model.eval()
     
@@ -141,7 +135,7 @@ def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, t
     number = number.data.cpu().numpy()[0]
     to_return = []
     for i in range(len(factors_list)):
-        to_return.append(postprocess(factors_list[i], log_probs[i], base_10_num, number, base, i, tokenizer))
+        to_return.append(postprocess(factors_list[i], log_probs[i], base_10_num, base, i, tokenizer, postprocess_minimal))
         
     if return_type=='df':
         return pd.DataFrame.from_dict(to_return)

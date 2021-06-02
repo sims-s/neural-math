@@ -82,7 +82,7 @@ def main(args):
 
 
     train_loader, test_loader = get_datasets(args)
-    args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader)
+    args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader) // args['optimizer']['gradient_accumulation_steps']
     
     os.makedirs(args['io']['save_path'], exist_ok=True)
     os.makedirs(args['io']['save_path'] + 'checkpoints/', exist_ok=True)
@@ -99,14 +99,8 @@ def main(args):
     model.load_state_dict(best_checkpoint)
     compute_factorization_metrics(model, tokenizer, device, args)
 
-    # Training rework:
-        # Ability to resume training
-        # Checkpoint at not end of epoch
-        # Gradient Accumulation
-    
-    # Why are real tokens predicted after padding? That shoulda been shut down.... FIx that bug!!
-
-    # Scale up to generalized bases
+    # Ability to resume during training... data set is small now! will be important!!!
+    # Deal with the fact that I really want to know if a number is prime but sometimes I don't have access to it.... :(
 
 if __name__ == "__main__":
     parser = ArgumentParser()

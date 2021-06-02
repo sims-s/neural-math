@@ -4,7 +4,7 @@ from tqdm.auto import tqdm
 import torch.nn as nn
 from generation_utils import factor
 from utils import load_json, save_json, load_data_file
-from optimization_utils import test_for_epoch
+from optimization_utils import test_on_loader
 from data_utils import prepare_dataloader
 import torch.autograd.profiler as profiler
 
@@ -29,20 +29,20 @@ def compute_factorization_metrics(model, tokenizer, device, args):
     metrics = compute_metrics(factor_df)
     # Add test loss to metrics
     loader = prepare_dataloader(test_data, args, **args['loader']['test'])
-    metrics['test_loss'] = test_for_epoch(model, loader, tokenizer, nn.CrossEntropyLoss(), device)
+    metrics['test_loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device, args['optimizer']['gradient_accumulation_steps'])
 
     metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
     save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
 
 
-def form_factor_df(model, tokenizer, device, base, items, max_decode_size, n_beams=1, temperature=1.0, max_num=-1):
+def form_factor_df(model, tokenizer, device, base, numbers, max_decode_size, n_beams=1, temperature=1.0, max_num=-1, postprocess_minimal=False):
     rows = []    
-    pbar = tqdm(total = min(len(items), max_num) if max_num > 0 else len(items), leave=False)
-    for i, num in enumerate(items):
+    pbar = tqdm(total = min(len(numbers), max_num) if max_num > 0 else len(numbers), leave=False)
+    for i, num in enumerate(numbers):
         if max_num > 0 and i >= max_num:
             break
         if num < 2: continue
-        rows.append(factor(num, base, model, tokenizer, device, max_decode_size, n_beams, temperature, return_type='dict'))
+        rows.append(factor(num, base, model, tokenizer, device, max_decode_size, n_beams, temperature, return_type='dict', postprocess_minimal=postprocess_minimal))
         pbar.update(1)
     pbar.update(2)
     pbar.close()

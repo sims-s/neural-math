@@ -2,3 +2,6 @@
 *.pkl
 notebooks/.ipynb_checkpoints/
 data/
+models/
+# models/**.csv
+# models/**.pkl

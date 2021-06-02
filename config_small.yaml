@@ -20,6 +20,7 @@
   'opt_args' : 
     'lr' : 0.001
   'max_grad_norm' : 1
+  'gradient_accumulation_steps' : 8
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
@@ -35,11 +36,14 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/update_tokenizer/'
+  'save_path' : './models/new_training/'
+  'checkpoint_every' : 80
+  'evaluate_every' : 1
+  'evaluate_final' : True
 
 'metrics' : 
   'n_beams' : 2
-  'max_num' : 1000
+  'max_num' : 100
   'save_suffix' : ''
   'temperature' : 1.0
 

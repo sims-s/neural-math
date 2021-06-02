@@ -2,7 +2,7 @@
 'data':
   'max_pow' : 16 # Data should be in range of [2, ...2**max_pow]. How long the decode sequence should be
   'data_loc' : './data/2^16.json' # Path to data file. Either folder and will auto use the one with the largest exponent formated as "2^x.json" OR a json file
-  'base' : 512
+  'base' : 3
 
 'model_args':
   'embed_dim' : 128
@@ -20,6 +20,7 @@
   'opt_args' : 
     'lr' : 0.001
   'max_grad_norm' : 1
+  'gradient_accumulation_steps' : 1
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
@@ -35,7 +36,10 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/base_512/'
+  'save_path' : './models/base_3/'
+  'checkpoint_every' : 1000
+  'evaluate_every' : 1
+  'evaluate_final' : True
 
 'metrics' : 
   'n_beams' : 2
