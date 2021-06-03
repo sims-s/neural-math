@@ -31,7 +31,7 @@ Model training can occur in many different bases. E.g. the number 12 may be repr
 | 2   | 100        |88.1%|[metrics.json](models/base_2/metrics_beam_100.json)|
 | 3   | 2        |42.7%|[metrics.json](models/base_3/metrics.json)|
 | 3   | 10        |66.6%|[metrics.json](models/base_3/metrics_beam_10.json)|
-| 3   | 100        ||[metrics.json](models/base_3/metrics_beam_100.json)|
+| 3   | 100        |89.3%|[metrics.json](models/base_3/metrics_beam_100.json)|
 | 24   | 2        |73%|[metrics.json](models/base_24/metrics.json)|
 | 24   | 10        |85.2%|[metrics.json](models/base_24/metrics_beam_10.json)|
 | 24   | 100        |93.5%|[metrics.json](models/base_24/metrics_beam_100.json)|
