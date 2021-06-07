@@ -96,5 +96,14 @@ def compute_metrics(factor_df):
     })
     metrics['pred_same_as_target_beam_0'].columns = mean_size_product_factorization
     metrics['pred_same_as_target_beam_0'] = metrics['pred_same_as_target_beam_0'].reset_index().to_dict(orient='index')
+
+    nonprime_df = grouped_by_num[~grouped_by_num['target_is_prime']]
+    nonprime_df['min_factor_decile'] = pd.qcut(nonprime_df['min_target_prime_factor_if_composite'], q=10, duplicates='drop').apply(str)
+    metrics['by_min_factor'] = nonprime_df.groupby('min_factor_decile').agg({
+        'correct_product' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size'],
+        'correct_factorization' : [lambda x: pd.Series([np.mean([y[0] for y in x])]), 'size']
+    })
+    metrics['by_min_factor'].columns = mean_size_product_factorization
+    metrics['by_min_factor'] = metrics['by_min_factor'].reset_index().to_dict(orient='index')
     
     return metrics

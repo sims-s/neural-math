@@ -193,6 +193,36 @@
             "correct_factorization_size": 1285
         }
     },
+    "by_min_factor": {
+        "0": {
+            "min_factor_decile": "(1.999, 3.0]",
+            "correct_product_mean": 0.9685900418799441,
+            "correct_product_size": 8596,
+            "correct_factorization_mean": 0.8157282456956724,
+            "correct_factorization_size": 8596
+        },
+        "1": {
+            "min_factor_decile": "(3.0, 5.0]",
+            "correct_product_mean": 0.9976798143851509,
+            "correct_product_size": 862,
+            "correct_factorization_mean": 0.24013921113689096,
+            "correct_factorization_size": 862
+        },
+        "2": {
+            "min_factor_decile": "(5.0, 17.0]",
+            "correct_product_mean": 0.9766606822262118,
+            "correct_product_size": 1114,
+            "correct_factorization_mean": 0.16337522441651706,
+            "correct_factorization_size": 1114
+        },
+        "3": {
+            "min_factor_decile": "(17.0, 241.0]",
+            "correct_product_mean": 0.9708480565371025,
+            "correct_product_size": 1132,
+            "correct_factorization_mean": 0.19257950530035337,
+            "correct_factorization_size": 1132
+        }
+    },
     "test_loss": 0.08167111496532373,
     "meta": {
         "n_beams": 2,

@@ -117,6 +117,8 @@ def postprocess(factor_list, log_prob, base_10_number, base, beam_idx, tokenizer
 
         information['pred_same_as_target'] = len(information['target_factor_list'])==1 and information['target_factor_list']==information['pred_factor_list']
 
+        information['min_target_prime_factor_if_composite'] = -1 if len(information['target_factor_list'])==1 else min(information['target_factor_list'])
+
     return information
         
 def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, temperature=1.0, return_type='df', postprocess_minimal=False):

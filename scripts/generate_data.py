@@ -9,13 +9,6 @@ sys.path.append('./src/PrimeFactorization/')
 from PrimeFactorization import primeFactorize
 
 
-def get_bounds(args):
-    ub = args.max_value if args.max_power < 0 else 2**args.max_power
-    if ub < 0:
-        raise ValueError('Need max_val or max_pow as input!')
-    lb = args.min_value if args.min_power < 0 else 2**args.min_power
-    return lb, ub
-
 def make_data(lb, ub):
     data = {}
     pbar = tqdm(total = ub-lb, leave=False)
@@ -58,8 +51,8 @@ def make_save_path(save_dir, lb, ub):
 
 
 def main(args):
-    lb, ub = get_bounds(args)
-    data = make_data(lb, ub)
+    ub = 2**args.max_power
+    data = make_data(ub)
     data = train_test_split(data, args.train_prob)
     save_path = make_save_path(args.save_path, lb, ub)
     save_json(data, save_path)
@@ -70,13 +63,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    # If min/max value is specified use that. Otherwise 2**(min/max power). Use 2 as lb if no min specified
     parser.add_argument('--max_power', type=int, help='max power of 2 to use', default=-1)
-    parser.add_argument('--min_power', type=int, help='min power of 2 to use', default=-1)
-    parser.add_argument('--max_value', type=int, help='max numebr to use', default=-1)
-    parser.add_argument('--min_value', type=int, help='min number to use', default=2)
-    parser.add_argument('--save_path', type=str, default='data/')
-    parser.add_argument('--train_prob', type=float, default=.8)
+    parser.add_argument('--save_folder', type=str, default='data/')
+    parser.add_argument('--train_amt', type=float, default=.8, help='train size or percent. If in [0,1] used as percent. Otherwise quantity')
 
     args = parser.parse_args()
     main(args)
