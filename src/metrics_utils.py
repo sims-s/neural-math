@@ -8,17 +8,13 @@ from optimization_utils import test_on_loader
 from data_utils import prepare_dataloader
 import torch.autograd.profiler as profiler
 
-def get_just_test_data(args):
-    return load_data_file(args['data']['data_loc'])['test']
 
 def compute_factorization_metrics(model, tokenizer, device, args):
     if args['verbose']:
         print('Computing metrics...')
-    test_data = get_just_test_data(args)
     
-    numbers = []
-    for _, factorization_dict in test_data.items():
-        numbers.append(factorization_dict['number'])
+    #TODO should pass argument for path of data instead of just taking test...
+    numbers = np.load(args['data']['test_path'], mmap_mode='r')
     if args['verbose']:
         print('Factoring...')
     factor_df = form_factor_df(model, tokenizer, device, args['data']['base'], numbers, args['model_args']['max_decode_size'],
@@ -28,7 +24,7 @@ def compute_factorization_metrics(model, tokenizer, device, args):
     factor_df.to_pickle(args['io']['save_path'] + 'factor_df%s.pkl'%save_suffix)
     metrics = compute_metrics(factor_df)
     # Add test loss to metrics
-    loader = prepare_dataloader(test_data, args, **args['loader']['test'])
+    loader = prepare_dataloader(args['data']['test_path'], args, **args['loader']['test'])
     metrics['test_loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device, args['optimizer']['gradient_accumulation_steps'])
 
     metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
@@ -38,7 +34,8 @@ def compute_factorization_metrics(model, tokenizer, device, args):
 def form_factor_df(model, tokenizer, device, base, numbers, max_decode_size, n_beams=1, temperature=1.0, max_num=-1, postprocess_minimal=False):
     rows = []    
     pbar = tqdm(total = min(len(numbers), max_num) if max_num > 0 else len(numbers), leave=False)
-    for i, num in enumerate(numbers):
+    for i in range(numbers.shape[0]):
+        num = numbers[i]
         if max_num > 0 and i >= max_num:
             break
         if num < 2: continue

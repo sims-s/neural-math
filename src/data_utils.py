@@ -1,8 +1,9 @@
-import os
-import re
 import numpy as np
-import utils
 from torch.utils.data import Dataset, DataLoader
+from sympy import factorint
+import utils
+
+
 
 
 def dec2base(n, b):
@@ -22,43 +23,45 @@ def base2dec(num, base):
         total += digit * (base ** i)
     return total
 
-def convert_base(data, base):
-    if 'train' in data:
-        data['train'] = convert_base(data['train'], base)
-        data['test'] = convert_base(data['test'], base)
-        return data
-    converted = {}
-    for i, factor_dict in data.items():
-        converted[i] = {'number' : dec2base(factor_dict['number'], base), 
-                        'factors' : {
-                            i : {
-                                    'tokens' : dec2base(int(factor), base),
-                                    'qty' : qty,
-                                }
-                                for i, (factor, qty) in enumerate(factor_dict['factors'].items())}
-                        }
-    return converted
 
 
-def prepare_dataloader(data, args, **loader_kwargs):
-    data = convert_base(data, args['data']['base'])
-    data = FactorizationDataset(data)
+def form_label(number, base):
+    factors = factorint(number, multiple=True)
+    factors = [dec2base(f, base) for f in factors]
+    factors = ['>'] + utils.list_join(factors, 'x') + ['.']
+    return factors
+
+def form_input(number, base):
+    number = dec2base(number, base)
+    return ['>'] + number + ['.']
+
+
+
+class FactorizationDataset(Dataset):
+    def __init__(self, number_file, base):
+        self.numbers = np.load(number_file, mmap_mode='r')
+        self.base = base
+    
+    def __getitem__(self, i):
+        number = self.numbers[i]
+        return {
+            'number' : form_input(number, self.base),
+            'label' : form_label(number, self.base)
+        }
+    def __len__(self):
+        return self.numbers.shape[0]
+
+def prepare_dataloader(number_file, args, **loader_kwargs):
+    data = FactorizationDataset(number_file, args['data']['base'])
     loader = DataLoader(data, collate_fn = lambda x: {
         'number': [y['number'] for y in x], 
         'label' : [y['label'] for y in x]}, 
         **loader_kwargs)
     return loader
 
-def form_label(label):
-    to_join = []
-    for _, factor_dict in label.items():
-        to_join.append(utils.list_join([factor_dict['tokens']] * factor_dict['qty'], 'x'))
-    factors = ['>'] + utils.list_join(to_join, 'x') + ['.']
-    return factors
 
-def form_input(number):
-    return ['>'] + number + ['.']
 
+"""
 class FactorizationDataset(Dataset):
     def __init__(self, data_dict):
         self.data_dict = self.keys_to_int(data_dict)
@@ -120,3 +123,33 @@ class GlobalFactorMapping():
         return len(factored)==1 and factored[list(factored.keys())[0]]==1
 
 gfm = None
+
+
+def convert_base(data, base):
+    if 'train' in data:
+        data['train'] = convert_base(data['train'], base)
+        data['test'] = convert_base(data['test'], base)
+        return data
+    converted = {}
+    for i, factor_dict in data.items():
+        converted[i] = {'number' : dec2base(factor_dict['number'], base), 
+                        'factors' : {
+                            i : {
+                                    'tokens' : dec2base(int(factor), base),
+                                    'qty' : qty,
+                                }
+                                for i, (factor, qty) in enumerate(factor_dict['factors'].items())}
+                        }
+    return converted
+
+
+def prepare_dataloader(data, args, **loader_kwargs):
+    data = convert_base(data, args['data']['base'])
+    data = FactorizationDataset(data)
+    loader = DataLoader(data, collate_fn = lambda x: {
+        'number': [y['number'] for y in x], 
+        'label' : [y['label'] for y in x]}, 
+        **loader_kwargs)
+    return loader
+
+"""

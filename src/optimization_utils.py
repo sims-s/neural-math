@@ -27,13 +27,12 @@ def test_on_loader(model, loader, tokenizer, loss_func, device, grad_accum_steps
     return np.mean(loss_hist)
 
 
-def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args, global_step, global_batches, global_loss_hist, test_loader):
+def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args, global_step, global_batches, global_loss_hist, test_loader, pbar):
     max_grad_norm = args['optimizer']['max_grad_norm']
     grad_accum_steps = args['optimizer']['gradient_accumulation_steps']
     checkpoint_every = args['io']['checkpoint_every']
     model.train()
-    pbar = tqdm(total = len(loader), leave=False)
-    loss_hist = [] 
+    loss_hist = []
     for i, batch in enumerate(loader):
         model.zero_grad()
         loss = run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, backward=True)
@@ -44,22 +43,23 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
                 nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             opt.step()
             scheduler.step()
+            pbar.update(1)
             global_step += 1
 
         if global_step and not global_step % checkpoint_every and not global_batches % checkpoint_every:
             global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_loss_hist, grad_accum_steps)
             loss_hist = []
-
         global_batches +=1
 
-        pbar.update(1)
+        if global_step >= args['scheduler']['max_steps']:
+            break
+
     if global_step==args['scheduler']['nb_steps']:
             global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_loss_hist, 
                                             grad_accum_steps, args['io']['evaluate_final'])
-    pbar.close()
 
     
-    return global_step, global_batches
+    return global_step, global_batches, global_loss_hist
 
 
 def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, train_loss, args, global_step, loss_hist, grad_accum_steps, force_test = False):
@@ -95,14 +95,14 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
         print('Starting training!')
     
     loss_func = nn.CrossEntropyLoss()
-    pbar = tqdm(total = args['scheduler']['nb_epochs'], leave=False)
+    pbar = tqdm(total = args['scheduler']['nb_steps'], leave=False)
+    print(args['scheduler']['nb_steps'])
     global_loss_hist = []
     global_step = 0
     global_batches = 0 
     for i in range(args['scheduler']['nb_epochs']):
-        global_step, global_batches = run_epoch(model, optimizer, scheduler, train_loader, tokenizer, loss_func, device, args, global_step, 
-                                 global_batches, global_loss_hist, test_loader)
-        pbar.update(1)
+        global_step, global_batches, global_loss_hist = run_epoch(model, optimizer, scheduler, train_loader, tokenizer, loss_func, device, args, global_step, 
+                                 global_batches, global_loss_hist, test_loader, pbar)
     pbar.close()
 
     

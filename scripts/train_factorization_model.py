@@ -5,16 +5,14 @@ import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from transformers import get_linear_schedule_with_warmup
+import pprint
 
 import sys
 sys.path.append('./src/')
-from utils import save_json, load_json, load_data_file
 from tokenizer import Tokenizer
-import data_utils
-from data_utils import prepare_dataloader, GlobalFactorMapping, gfm
+from data_utils import prepare_dataloader
 from models import Factorizer
 from optimization_utils import run_training
-from generation_utils import factor
 from metrics_utils import compute_factorization_metrics
 from utils import get_best_checkpoint, backfill_args
 
@@ -23,10 +21,9 @@ from utils import get_best_checkpoint, backfill_args
 def get_datasets(args):
     if args['verbose']:
         print('Loading data...')
-    data = load_data_file(args['data']['data_loc'])
-    
-    return prepare_dataloader(data['train'], args, **args['loader']['train']), \
-           prepare_dataloader(data['test'], args, **args['loader']['test'])
+
+    return prepare_dataloader(args['data']['train_path'], args, **args['loader']['train']), \
+           prepare_dataloader(args['data']['test_path'], args, **args['loader']['test'])
     
 
 def compute_extra_args(args, tokenizer):
@@ -70,20 +67,22 @@ def get_model_opt_scheduler(args, device):
         
     return model, optimizer, scheduler, args
 
+def compute_nb_steps(args, train_loader):
+    args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader) // args['optimizer']['gradient_accumulation_steps']
+    if args['scheduler']['max_steps'] > 0:
+        args['scheduler']['nb_steps'] = min(args['scheduler']['nb_steps'], args['scheduler']['max_steps'])
+    return args
 
 
 def main(args):
     device = torch.device('cuda')
     tokenizer = Tokenizer(args['data']['base'])
     args = compute_extra_args(args, tokenizer)
-    data_utils.gfm = GlobalFactorMapping(data_path = args['data']['data_loc'] if args['data']['data_loc'].endswith('.json') else \
-                                          args['data']['data_loc'] + '2^%d.json'%args['data']['max_pow'])
-
-
 
     train_loader, test_loader = get_datasets(args)
-    args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader) // args['optimizer']['gradient_accumulation_steps']
-    
+
+    args = compute_nb_steps(args, train_loader)
+
     os.makedirs(args['io']['save_path'], exist_ok=True)
     os.makedirs(args['io']['save_path'] + 'checkpoints/', exist_ok=True)
 
@@ -91,7 +90,8 @@ def main(args):
 
     if args['verbose']:
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
-        print('Model args: ', args['model_args'])
+        print('Model args: ')
+        pprint.pprint(args['model_args'])
 
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args)
     

@@ -5,6 +5,8 @@ import data_utils
 import utils
 from data_utils import dec2base, base2dec, FactorizationDataset
 from Levenshtein import distance as levenshtein_distance
+from sympy import factorint
+from sympy.ntheory.primetest import isprime
 
 
 
@@ -53,9 +55,6 @@ def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding
     sequence_log_probs = sequence_log_probs.data.cpu().numpy()
     return sequences, sequence_log_probs
 
-def compute_target_str(base_10_number, base):
-    factors = data_utils.convert_base({0:{'number' : base_10_number, 'factors' : data_utils.gfm[base_10_number]}}, base)[0]['factors']
-    return [str(token) for token in data_utils.form_label(factors)]
 
 def extract_factors(factor_list):
     chunked = []
@@ -93,17 +92,17 @@ def postprocess(factor_list, log_prob, base_10_number, base, beam_idx, tokenizer
         information['product'] = np.nan
 
     information['correct_product'] = information['product']==base_10_number
-    information['correct_factorization'] = information['correct_product'] & all([data_utils.gfm.is_prime(n) for n in information['pred_factor_list']])
+    information['correct_factorization'] = information['correct_product'] & all([isprime(n) for n in information['pred_factor_list']])
 
 
     if not postprocess_minimal:
-        information['target_is_prime'] = data_utils.gfm.is_prime(base_10_number)
+        information['target_is_prime'] = isprime(base_10_number)
         information['input_string'] = dec2base(base_10_number, base)
         information['pred_list'] = factor_list
         information['pred_str'] = tokenized
         try:
-            information['target_str'] = ' '.join(compute_target_str(base_10_number, base))
-            information['target_factor_list'] = sum([[k]*v for k, v in data_utils.gfm[base_10_number].items()], [])
+            information['target_str'] = ' '.join([str(c) for c in data_utils.form_label(base_10_number, base)])
+            information['target_factor_list'] = sum([[k]*v for k, v in factorint(base_10_number).items()], [])
         except KeyError:
             information['target_str'] = ''
             information['target_factor_list'] = ''
@@ -112,7 +111,7 @@ def postprocess(factor_list, log_prob, base_10_number, base, beam_idx, tokenizer
         information['n_pred_factors'] = len(information['pred_factor_list'])
         
         
-        information['num_prime_factors_pred'] = np.sum([data_utils.gfm.is_prime(f) for f in factors if f in data_utils.gfm])
+        information['num_prime_factors_pred'] = np.sum([isprime(f) for f in factors])
         information['percent_prime_factors_pred'] = information['num_prime_factors_pred'] / information['n_pred_factors']
 
         information['pred_same_as_target'] = len(information['target_factor_list'])==1 and information['target_factor_list']==information['pred_factor_list']
@@ -126,8 +125,7 @@ def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, t
     model.eval()
     
     # Conver the number to a tensor
-    number = dec2base(number, base)
-    number = tokenizer.encode(data_utils.form_input(number))
+    number = tokenizer.encode(data_utils.form_input(number, base))
     number = torch.tensor(number).unsqueeze(0).to(device)
     # Encode the number
     with torch.no_grad():

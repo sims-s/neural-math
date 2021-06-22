@@ -1,7 +1,8 @@
 ---
 'data':
   'max_pow' : 16 # Data should be in range of [2, ...2**max_pow]. How long the decode sequence should be
-  'data_loc' : './data/2^16.json' # Path to data file. Either folder and will auto use the one with the largest exponent formated as "2^x.json" OR a json file
+  'train_path' : 'data/train_data_2^16.npy'
+  'test_path' : 'data/test_data_2^16.npy'
   'base' : 2
 
 'model_args':
@@ -26,6 +27,7 @@
   'type' : linear_schedule_with_warmup
   'n_warmup_steps' : 10
   'nb_epochs' : 1
+  'max_steps' : 240
 
 'loader' :
   'train' : 
@@ -44,7 +46,7 @@
 'metrics' : 
   'n_beams' : 2
   'max_num' : 100
-  'save_suffix' : ''
+  'save_suffix' : 'small'
   'temperature' : 1.0
 
 'verbose' : True
