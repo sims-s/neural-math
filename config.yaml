@@ -38,7 +38,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/base_5/'
+  'save_path' : './models/base_2_v2/'
   'checkpoint_every' : 1000
   'evaluate_every' : 1
   'evaluate_final' : True
