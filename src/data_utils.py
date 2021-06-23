@@ -1,9 +1,53 @@
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+import torch
+from torch.utils.data import Dataset, DataLoader, Sampler
 from sympy import factorint
 import utils
 
+class RandomMemorylessSampler(Sampler[int]):
+    r"""Samples elements randomly. If without replacement, then sample from a shuffled dataset.
+    If with replacement, then user can specify :attr:`num_samples` to draw.
 
+    Arguments:
+        data_source (Dataset): dataset to sample from
+        replacement (bool): samples are drawn on-demand with replacement if ``True``, default=``False``
+        num_samples (int): number of samples to draw, default=`len(dataset)`. This argument
+            is supposed to be specified only when `replacement` is ``True``.
+        generator (Generator): Generator used in sampling.
+    """
+
+    def __init__(self, data_source, replacement = False,
+                 num_samples = None, generator=None) -> None:
+        self.data_source = data_source
+        self.replacement = replacement
+        self._num_samples = num_samples
+        self.generator = generator
+
+        if not isinstance(self.replacement, bool):
+            raise TypeError("replacement should be a boolean value, but got "
+                            "replacement={}".format(self.replacement))
+
+        if self._num_samples is not None and not replacement:
+            raise ValueError("With replacement=False, num_samples should not be specified, "
+                             "since a random permute will be performed.")
+
+        if not isinstance(self.num_samples, int) or self.num_samples <= 0:
+            raise ValueError("num_samples should be a positive integer "
+                             "value, but got num_samples={}".format(self.num_samples))
+
+    @property
+    def num_samples(self) -> int:
+        # dataset size might change at runtime
+        if self._num_samples is None:
+            return len(self.data_source)
+        return self._num_samples
+
+    def __iter__(self):
+        n = len(self.data_source)
+        yield np.random.randint(n)
+
+    def __len__(self):
+        return self.num_samples
 
 
 def dec2base(n, b):
@@ -53,9 +97,16 @@ class FactorizationDataset(Dataset):
 
 def prepare_dataloader(number_file, args, **loader_kwargs):
     data = FactorizationDataset(number_file, args['data']['base'])
+    sampler = None
+    if loader_kwargs.pop('random_sampling', False):
+        pass
+    #     sampler = RandomMemorylessSampler(data)
+    # print(sampler)
+    # sys.exit()
     loader = DataLoader(data, collate_fn = lambda x: {
         'number': [y['number'] for y in x], 
-        'label' : [y['label'] for y in x]}, 
+        'label' : [y['label'] for y in x]},
+        sampler = sampler,
         **loader_kwargs)
     return loader
 

@@ -1,9 +1,8 @@
 ---
 'data':
-  'max_pow' : 16 # Data should be in range of [2, ...2**max_pow]. How long the decode sequence should be
-  'train_path' : 'data/train_data.npy'
-  'test_path' : 'data/test_data.npy'
-  'base' : 5
+  'train_path' : 'data/train_data_2^24.npy'
+  'test_path' : 'data/test_data_2^24.npy'
+  'base' : 24 # base the number is factored in
 
 'model_args':
   'embed_dim' : 128
@@ -26,19 +25,22 @@
 'scheduler' : 
   'type' : linear_schedule_with_warmup
   'n_warmup_steps' : 10000
-  'nb_epochs' : 10
+  'nb_epochs' : 2
   'max_steps' : -1
 
 'loader' :
   'train' : 
     'batch_size' : 64
-    'shuffle' : True
+    'random_sampling' : True # random_sampling is slightly different than shuffle b/c it allows same # to be sampled multiple times.
+                             # Benefit is that we don't need to store the numbers that've been sampled in memory --> use instead for large data sizes 
+                             # (empircally don't go too much higher than using shuffle instead 2**27)
+
   'test' : 
     'batch_size' : 256
     'shuffle' : False
 
 'io':
-  'save_path' : './models/base_2_v2/'
+  'save_path' : './models/experiment/'
   'checkpoint_every' : 1000
   'evaluate_every' : 1
   'evaluate_final' : True

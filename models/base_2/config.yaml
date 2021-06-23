@@ -1,7 +1,7 @@
 data:
   base: 2
-  data_loc: ./data/2^16.json
-  max_pow: 16
+  test_path: data/test_data_2^16.npy
+  train_path: data/train_data_2^16.npy
 io:
   checkpoint_every: 1000
   evaluate_every: 1
@@ -36,9 +36,10 @@ optimizer:
     lr: 0.001
   type: adam
 scheduler:
+  max_steps: -1
   n_warmup_steps: 10000
   nb_epochs: 200
-  nb_steps: 164200
+  nb_steps: 164000
   type: linear_schedule_with_warmup
 tokenizer:
   n_tokens: 6

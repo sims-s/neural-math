@@ -10,24 +10,14 @@ sys.path.append('./src/')
 from utils import save_json, load_json
 from tokenizer import Tokenizer
 import data_utils
-from data_utils import FactorizationDataset, convert_base, prepare_dataloader, GlobalFactorMapping, gfm
+from data_utils import prepare_dataloader
 from models import Factorizer
 from metrics_utils import compute_factorization_metrics
 from utils import get_best_checkpoint, update_args_with_cli, backfill_args
 
 
-
-def load_data_file(args):
-    if args['data']['data_loc'].endswith('.json'):
-        return load_json(args['data']['data_loc'])
-    else:
-        return load_json(args['data']['data_loc'] + '2^%d.json'%args['data']['max_pow'])
-
 def get_test_dataset(args):
-    if args['verbose']:
-        print('Loading data...')
-    data = load_data_file(args)
-    return prepare_dataloader(data['test'], args, **args['loader']['test'])
+    return prepare_dataloader(args['data']['test_path'], args, **args['loader']['test'])
     
 
 
@@ -58,8 +48,6 @@ def main(input_args):
     args = backfill_args(args)
     # update the saved arguments incase you want to change stuff (e.g. # beams, etc)
     args = update_args_with_cli(args, input_args)
-    data_utils.gfm = GlobalFactorMapping(data_path = args['data']['data_loc'] if args['data']['data_loc'].endswith('.json') else \
-                                          args['data']['data_loc'] + '2^%d.json'%args['data']['max_pow'])
 
     device = torch.device('cuda')
     tokenizer = Tokenizer(args['data']['base'])

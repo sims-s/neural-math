@@ -51,7 +51,7 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
             loss_hist = []
         global_batches +=1
 
-        if global_step >= args['scheduler']['max_steps']:
+        if global_step >= args['scheduler']['nb_steps']:
             break
 
     if global_step==args['scheduler']['nb_steps']:
@@ -96,7 +96,6 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
     
     loss_func = nn.CrossEntropyLoss()
     pbar = tqdm(total = args['scheduler']['nb_steps'], leave=False)
-    print(args['scheduler']['nb_steps'])
     global_loss_hist = []
     global_step = 0
     global_batches = 0 
