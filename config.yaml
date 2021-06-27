@@ -1,7 +1,7 @@
 ---
 'data':
-  'train_path' : 'data/train_data_2^24.npy'
-  'test_path' : 'data/test_data_2^24.npy'
+  'train_path' : 'data/train_data_2^18.npy'
+  'test_path' : 'data/test_data_2^18.npy'
   'base' : 24 # base the number is factored in
 
 'model_args':
@@ -24,8 +24,8 @@
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
-  'n_warmup_steps' : 10000
-  'nb_epochs' : 2
+  'n_warmup_steps' : 24000
+  'nb_epochs' : 200
   'max_steps' : -1
 
 'loader' :
@@ -40,8 +40,8 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/experiment/'
-  'checkpoint_every' : 1000
+  'save_path' : './models/base_24_2^18/'
+  'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True
 
@@ -50,6 +50,9 @@
   'max_num' : -1
   'save_suffix' : ''
   'temperature' : 1.0
+
+'multi_gpu' : 'auto'
+
 
 
 'verbose' : True

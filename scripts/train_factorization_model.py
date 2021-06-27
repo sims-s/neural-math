@@ -14,8 +14,10 @@ from data_utils import prepare_dataloader
 from models import Factorizer
 from optimization_utils import run_training
 from metrics_utils import compute_factorization_metrics
-from utils import get_best_checkpoint, backfill_args
-
+from utils import get_best_checkpoint, get_last_checkpoint
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
 
 
 def get_datasets(args):
@@ -32,6 +34,7 @@ def compute_extra_args(args, tokenizer):
     args['tokenizer'] = {}
     args['tokenizer']['n_tokens'] = len(tokenizer)
     args['tokenizer']['pad_token_id'] = tokenizer.encode('_')[0]
+    args['multi_gpu'] = torch.cuda.device_count() > 1 and args['multi_gpu']
     return args
 
 
@@ -40,6 +43,8 @@ def get_model(args, device):
                         pad_token_id = args['tokenizer']['pad_token_id'],
                          **args['model_args'])
     model.to(device)
+    if args['multi_gpu']:
+        model = DDP(model, device_ids=[device])
     return model
 
 def get_optimizer(args, model):
@@ -73,31 +78,62 @@ def compute_nb_steps(args, train_loader):
         args['scheduler']['nb_steps'] = min(args['scheduler']['nb_steps'], args['scheduler']['max_steps'])
     return args
 
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
 
-def main(args):
-    device = torch.device('cuda')
+    # initialize the process group
+    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+def cleanup():
+    dist.destroy_process_group()
+
+def run(f, world_size, args):
+    mp.spawn(f, args=(world_size, args), nprocs=world_size, join=True)
+
+def main(rank, args):
+    if torch.cuda.device_count() > 1 and args['multi_gpu']:
+        setup(rank, torch.cuda.device_count())
+        device = rank
+        map_location = {'cuda:%d' % 0: 'cuda:%d' % rank}
+    else:
+        device = torch.device('cuda')
+        map_location = None
     tokenizer = Tokenizer(args['data']['base'])
     args = compute_extra_args(args, tokenizer)
 
     train_loader, test_loader = get_datasets(args)
 
     args = compute_nb_steps(args, train_loader)
-
-    os.makedirs(args['io']['save_path'], exist_ok=True)
-    os.makedirs(args['io']['save_path'] + 'checkpoints/', exist_ok=True)
-
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
+
+    if os.path.exists(args['io']['save_path']) and not args['resume_training']:
+        raise ValueError("Save path %s already exists, but not resuming training. Add '--resume_training' to arguments to resume training"%args['io']['save_path'])
+    elif args['resume_training']:
+        latest_checkpoint = get_last_checkpoint(args['io']['save_path'], map_location)
+        model.load_state_dict(latest_checkpoint['model_state_dict'])
+        optimizer.load_state_dict(latest_checkpoint['opt_state_dict'])
+    else:
+        os.makedirs(args['io']['save_path'])
+        os.makedirs(args['io']['save_path'] + 'checkpoints/')
+        latest_checkpoint = None
 
     if args['verbose']:
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
         print('Model args: ')
         pprint.pprint(args['model_args'])
 
-    run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args)
-    
-    best_checkpoint = get_best_checkpoint(args['io']['save_path'])['model_state_dict']
+    run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args, latest_checkpoint)
+
+    if args['multi_gpu']:
+        dist.barrier()
+
+    best_checkpoint = get_best_checkpoint(args['io']['save_path'], map_location=map_location)['model_state_dict']
     model.load_state_dict(best_checkpoint)
     compute_factorization_metrics(model, tokenizer, device, args)
+
+    if args['multi_gpu']:
+        cleanup()
 
     # Ability to resume during training... data set is small now! will be important!!!
     # Deal with the fact that I really want to know if a number is prime but sometimes I don't have access to it.... :(
@@ -105,9 +141,15 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--config', required=True)
+    parser.add_argument('--resume_training', action='store_true', default=False)
     args = parser.parse_args()
     with open(args.config, 'r') as f:
-        args = yaml.safe_load(f)
-    main(args)
+        config_args = yaml.safe_load(f)
+        config_args['resume_training'] = args.resume_training
+    
+    if torch.cuda.device_count() > 1 and config_args['multi_gpu']:
+        run(main, torch.cuda.device_count(), config_args)
+    else:
+        main(None, config_args)
 
 

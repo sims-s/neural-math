@@ -38,31 +38,31 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
         loss = run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, backward=True)
         loss_hist.append(loss)
 
-        if global_batches and not global_batches % grad_accum_steps:
+        if not global_batches % grad_accum_steps:
             if max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             opt.step()
             scheduler.step()
             pbar.update(1)
             global_step += 1
-
-        if global_step and not global_step % checkpoint_every and not global_batches % checkpoint_every:
-            global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_loss_hist, grad_accum_steps)
-            loss_hist = []
         global_batches +=1
 
+        if global_step and not global_step % checkpoint_every and not global_batches % checkpoint_every:
+            global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, grad_accum_steps)
+            loss_hist = []
+        
         if global_step >= args['scheduler']['nb_steps']:
             break
 
     if global_step==args['scheduler']['nb_steps']:
-            global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_loss_hist, 
+            global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, 
                                             grad_accum_steps, args['io']['evaluate_final'])
 
     
     return global_step, global_batches, global_loss_hist
 
 
-def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, train_loss, args, global_step, loss_hist, grad_accum_steps, force_test = False):
+def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, train_loss, args, global_step, global_batches, loss_hist, grad_accum_steps, force_test = False):
     if args['io']['save_path']:
         if not (global_step / args['io']['checkpoint_every']) % args['io']['evaluate_every'] or force_test:
             test_loss = test_on_loader(model, test_loader, tokenizer, loss_func, device, grad_accum_steps)
@@ -81,24 +81,36 @@ def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, trai
                     'train_loss' : train_loss, 
                     'test_loss' : test_loss,
                     'args': args, 
-                    'global_step' : global_step},
+                    'global_step' : global_step,
+                    'global_batches' : global_batches},
                     '%s/%d_%.4f.pt'%(os.path.join(args['io']['save_path'], 'checkpoints'), global_step, test_loss))
 
     return loss_hist
 
 
-def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args):
+def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args, latest_checkpoint):
     with open(args['io']['save_path'] + 'config.yaml', 'w') as f:
         yaml.dump(args, f)
 
     if args['verbose']:
-        print('Starting training!')
+        if latest_checkpoint is None:
+            print('Starting training!')
+        else:
+            print('Resuming Training!')
     
     loss_func = nn.CrossEntropyLoss()
     pbar = tqdm(total = args['scheduler']['nb_steps'], leave=False)
-    global_loss_hist = []
-    global_step = 0
-    global_batches = 0 
+    if latest_checkpoint is None:
+        global_loss_hist = []
+        global_step = 0
+        global_batches = 0 
+    else:
+        args = latest_checkpoint['args']
+        global_loss_hist = pd.read_csv(os.path.join(args['io']['save_path']) + 'loss_hist.csv').values.tolist()
+        global_step = latest_checkpoint['global_step']
+        global_batches = latest_checkpoint['global_batches']
+        pbar.update(global_step)
+    print(global_step, global_batches)
     for i in range(args['scheduler']['nb_epochs']):
         global_step, global_batches, global_loss_hist = run_epoch(model, optimizer, scheduler, train_loader, tokenizer, loss_func, device, args, global_step, 
                                  global_batches, global_loss_hist, test_loader, pbar)

@@ -35,7 +35,7 @@ def load_data_file(dir_or_path):
     else:
         return load_json(dir_or_path + '2^%d.json'%args['data']['max_pow'])
 
-def get_best_checkpoint(path):
+def get_best_checkpoint(path, map_location=None):
     if path.endswith('.pt'):
         chosen_path = path
     else:
@@ -46,7 +46,19 @@ def get_best_checkpoint(path):
         best_loss_idx = np.argmin(losses)
         chosen_path = path + files[best_loss_idx]
     print('Loading model at %s'%chosen_path)
-    return torch.load(chosen_path)
+    return torch.load(chosen_path, map_location=map_location)
+
+
+def get_last_checkpoint(path, map_location):
+    if not 'checkpoints' in path:
+        path = os.path.join(path, 'checkpoints/')
+    files = [f for f in os.listdir(path) if f.endswith('.pt')]
+    steps = [int(fname.split('_')[0]) for fname in files]
+    latest_model_idx = np.argmax(steps)
+    chosen_path = path + files[latest_model_idx]
+    print('Loading model at %s'%chosen_path)
+    return torch.load(chosen_path, map_location=map_location)
+
     
 def update_args_with_cli(args, input_args):
     args['metrics']['max_num'] = input_args.max_num
@@ -55,7 +67,7 @@ def update_args_with_cli(args, input_args):
         args['metrics']['n_beams'] = input_args.n_beams
     args['io']['save_path'] = input_args.path
     if input_args.data_loc:
-        args['data']['data_loc'] = input_args.data_loc
+        args['data']['test_path'] = input_args.data_loc
     if input_args.temperature > 0:
         args['metrics']['temperature'] = input_args.temperature
     return args
