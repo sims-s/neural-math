@@ -107,7 +107,8 @@ def main(rank, args):
     args = compute_nb_steps(args, train_loader)
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
 
-    if os.path.exists(args['io']['save_path']) and not args['resume_training']:
+    checkpoint_dir = os.path.join(args['io']['save_path'], 'checkpoints')
+    if os.path.exists(checkpoint_dir) and len(os.listdir(checkpoint_dir)) > 1 and not args['resume_training']:
         raise ValueError("Save path %s already exists, but not resuming training. Add '--resume_training' to arguments to resume training"%args['io']['save_path'])
     elif args['resume_training']:
         latest_checkpoint = get_last_checkpoint(args['io']['save_path'], map_location)
@@ -146,6 +147,7 @@ if __name__ == "__main__":
     with open(args.config, 'r') as f:
         config_args = yaml.safe_load(f)
         config_args['resume_training'] = args.resume_training
+    
     
     if torch.cuda.device_count() > 1 and config_args['multi_gpu']:
         run(main, torch.cuda.device_count(), config_args)

@@ -110,7 +110,6 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
         global_step = latest_checkpoint['global_step']
         global_batches = latest_checkpoint['global_batches']
         pbar.update(global_step)
-    print(global_step, global_batches)
     for i in range(args['scheduler']['nb_epochs']):
         global_step, global_batches, global_loss_hist = run_epoch(model, optimizer, scheduler, train_loader, tokenizer, loss_func, device, args, global_step, 
                                  global_batches, global_loss_hist, test_loader, pbar)

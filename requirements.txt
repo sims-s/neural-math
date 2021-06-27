@@ -2,7 +2,9 @@ numpy
 pandas
 matplotlib
 tqdm
-torch
+torch==1.7.1
 pyunpack
 patool
 sympy
+transformers
+Levenshtein

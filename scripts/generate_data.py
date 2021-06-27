@@ -32,9 +32,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('--max_val', type=int, default=2**32, help='genreate integers from 2...max_val')
+    parser.add_argument('--max_val', type=int, default=2**18, help='genreate integers from 2...max_val')
     parser.add_argument('--min_prime_factor', type=int, default=1, help='Only save numbers that do not have primes smaller than this value as factors')
-    parser.add_argument('--test_pct', type=float, default=.002)
+    parser.add_argument('--test_pct', type=float, default=.1)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--save_dir', default='data/')
     parser.add_argument('--suffix', default='')
