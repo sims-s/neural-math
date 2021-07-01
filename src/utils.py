@@ -65,11 +65,17 @@ def update_args_with_cli(args, input_args):
     args['metrics']['save_suffix'] = input_args.suffix
     if input_args.n_beams > 0:
         args['metrics']['n_beams'] = input_args.n_beams
-    args['io']['save_path'] = input_args.path
+    
+    if 'checkpoints' in input_args.path:
+        path = input_args.path
+        args['io']['save_path'] = path[:path.find('checkpoints')]
+    else:
+        args['io']['save_path'] = input_args.path
     if input_args.data_loc:
         args['data']['test_path'] = input_args.data_loc
     if input_args.temperature > 0:
         args['metrics']['temperature'] = input_args.temperature
+    args['loader']['test']['num_workers'] = input_args.num_workers
     return args
 
 def backfill_args(args):

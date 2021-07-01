@@ -42,8 +42,6 @@ def load_model(args, device, state_dict):
 def main(input_args):
     checkpoint = get_best_checkpoint(input_args.path)
 
-    with open(input_args.path + 'config.yaml', 'r') as f:
-        args = yaml.safe_load(f)
     args = checkpoint['args']
     args = backfill_args(args)
     # update the saved arguments incase you want to change stuff (e.g. # beams, etc)
@@ -66,6 +64,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_beams', default=-1, type=int)
     parser.add_argument('--temperature', default=-1, type=float)
     parser.add_argument('--data_loc', default='', type=str)
+    parser.add_argument('--num_workers', default=0, type=int, help='num workers for dataloader. default is one')
     args = parser.parse_args()
     main(args)
 

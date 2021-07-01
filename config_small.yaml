@@ -39,7 +39,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/new_training/'
+  'save_path' : './models/grad_accum_test2/'
   'checkpoint_every' : 80
   'evaluate_every' : 1
   'evaluate_final' : True

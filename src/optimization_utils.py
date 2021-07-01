@@ -6,12 +6,14 @@ import pandas as pd
 import yaml
 import os
 
-def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, backward=True):
+def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True):
     numbers = torch.tensor(tokenizer.encode(batch['number'])).to(device)
     labels = torch.tensor(tokenizer.encode(batch['label'])).to(device)
     res = model(numbers, labels[:,:-1])
-    loss = loss_func(res.view(-1, len(tokenizer)), labels[:,1:].reshape(-1)) / grad_accum_steps
-    if backward:
+    loss = loss_func(res.view(-1, len(tokenizer)), labels[:,1:].reshape(-1))
+    if train:
+        loss = loss / grad_accum_steps
+    if train:
         loss.backward()
     return loss.item()
     
@@ -21,7 +23,7 @@ def test_on_loader(model, loader, tokenizer, loss_func, device, grad_accum_steps
     loss_hist = []
     with torch.no_grad():
         for i, batch in enumerate(loader):
-            loss_hist.append(run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, backward=False))
+            loss_hist.append(run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=False))
             pbar.update(1)
     pbar.close()
     return np.mean(loss_hist)
@@ -33,10 +35,12 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
     checkpoint_every = args['io']['checkpoint_every']
     model.train()
     loss_hist = []
+    batch_loss = 0
     for i, batch in enumerate(loader):
         model.zero_grad()
-        loss = run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, backward=True)
-        loss_hist.append(loss)
+        loss = run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True)
+        batch_loss += loss
+        
 
         if not global_batches % grad_accum_steps:
             if max_grad_norm > 0:
@@ -45,6 +49,8 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
             scheduler.step()
             pbar.update(1)
             global_step += 1
+            loss_hist.append(batch_loss)
+            batch_loss = 0
         global_batches +=1
 
         if global_step and not global_step % checkpoint_every and not global_batches % checkpoint_every:

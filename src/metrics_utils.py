@@ -26,7 +26,6 @@ def compute_factorization_metrics(model, tokenizer, device, args):
     # Add test loss to metrics
     loader = prepare_dataloader(args['data']['test_path'], args, **args['loader']['test'])
     metrics['test_loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device, args['optimizer']['gradient_accumulation_steps'])
-
     metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
     save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
 
