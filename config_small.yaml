@@ -22,13 +22,13 @@
   'opt_args' : 
     'lr' : 0.001
   'max_grad_norm' : 1
-  'gradient_accumulation_steps' : 8
+  'gradient_accumulation_steps' : 1
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
   'n_warmup_steps' : 10
   'nb_epochs' : 1
-  'max_steps' : 240
+  'max_steps' : 500
 
 'loader' :
   'train' : 
@@ -39,7 +39,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/grad_accum_test2/'
+  'save_path' : './models/checkpoint_test/'
   'checkpoint_every' : 80
   'evaluate_every' : 1
   'evaluate_final' : True

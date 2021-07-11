@@ -5,6 +5,15 @@ import numpy as np
 import pandas as pd
 import yaml
 import os
+from scheduler import get_linear_schedule_with_warmup
+
+def get_scheduler(args, optimizer):
+    # linear_schedule_with_warmup
+    if args['scheduler']['type']=='linear_schedule_with_warmup':
+        scheduler = get_linear_schedule_with_warmup(optimizer, args['scheduler']['n_warmup_steps'], args['scheduler']['nb_steps'])
+    else:
+        raise ValueError('only using linear_schedule_with_warmup right now')
+    return scheduler
 
 def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True):
     numbers = torch.tensor(tokenizer.encode(batch['number'])).to(device)
@@ -54,7 +63,7 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
         global_batches +=1
 
         if global_step and not global_step % checkpoint_every and not global_batches % checkpoint_every:
-            global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, grad_accum_steps)
+            global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, grad_accum_steps, scheduler)
             loss_hist = []
         
         if global_step >= args['scheduler']['nb_steps']:
@@ -62,13 +71,13 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
 
     if global_step==args['scheduler']['nb_steps']:
             global_loss_hist = checkpoint(model, opt, test_loader, tokenizer, loss_func, device, np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, 
-                                            grad_accum_steps, args['io']['evaluate_final'])
+                                            grad_accum_steps, scheduler, args['io']['evaluate_final'])
 
     
     return global_step, global_batches, global_loss_hist
 
 
-def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, train_loss, args, global_step, global_batches, loss_hist, grad_accum_steps, force_test = False):
+def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, train_loss, args, global_step, global_batches, loss_hist, grad_accum_steps, scheduler, force_test = False):
     if args['io']['save_path']:
         if not (global_step / args['io']['checkpoint_every']) % args['io']['evaluate_every'] or force_test:
             test_loss = test_on_loader(model, test_loader, tokenizer, loss_func, device, grad_accum_steps)
@@ -88,7 +97,8 @@ def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, trai
                     'test_loss' : test_loss,
                     'args': args, 
                     'global_step' : global_step,
-                    'global_batches' : global_batches},
+                    'global_batches' : global_batches,
+                    'scheduler_state_dict' : scheduler.state_dict()},
                     '%s/%d_%.4f.pt'%(os.path.join(args['io']['save_path'], 'checkpoints'), global_step, test_loss))
 
     return loss_hist
@@ -121,6 +131,5 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
                                  global_batches, global_loss_hist, test_loader, pbar)
     pbar.close()
 
-    
     if args['verbose']:
         print('Finished Training!')

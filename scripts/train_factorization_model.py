@@ -4,7 +4,6 @@ import os
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
-from transformers import get_linear_schedule_with_warmup
 import pprint
 
 import sys
@@ -12,7 +11,7 @@ sys.path.append('./src/')
 from tokenizer import Tokenizer
 from data_utils import prepare_dataloader
 from models import Factorizer
-from optimization_utils import run_training
+from optimization_utils import run_training, get_scheduler
 from metrics_utils import compute_factorization_metrics
 from utils import get_best_checkpoint, get_last_checkpoint
 import torch.multiprocessing as mp
@@ -53,14 +52,6 @@ def get_optimizer(args, model):
     else:
         raise ValueError('Only using adam right now')
     return opt
-
-def get_scheduler(args, optimizer):
-    # linear_schedule_with_warmup
-    if args['scheduler']['type']=='linear_schedule_with_warmup':
-        scheduler = get_linear_schedule_with_warmup(optimizer, args['scheduler']['n_warmup_steps'], args['scheduler']['nb_steps'])
-    else:
-        raise ValueError('only using linear_schedule_with_warmup right now')
-    return scheduler
 
 
 def get_model_opt_scheduler(args, device):
@@ -114,6 +105,7 @@ def main(rank, args):
         latest_checkpoint = get_last_checkpoint(args['io']['save_path'], map_location)
         model.load_state_dict(latest_checkpoint['model_state_dict'])
         optimizer.load_state_dict(latest_checkpoint['opt_state_dict'])
+        scheduler.load_state_dict(latest_checkpoint['scheduler_state_dict'])
     else:
         os.makedirs(args['io']['save_path'])
         os.makedirs(args['io']['save_path'] + 'checkpoints/')
