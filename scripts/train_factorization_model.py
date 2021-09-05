@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import pprint
-
 import sys
+import wandb
 sys.path.append('./src/')
 from tokenizer import Tokenizer
 from data_utils import prepare_dataloader
@@ -14,6 +14,7 @@ from models import Factorizer
 from optimization_utils import run_training, get_scheduler
 from metrics_utils import compute_factorization_metrics
 from utils import get_best_checkpoint, get_last_checkpoint
+
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
@@ -69,6 +70,17 @@ def compute_nb_steps(args, train_loader):
         args['scheduler']['nb_steps'] = min(args['scheduler']['nb_steps'], args['scheduler']['max_steps'])
     return args
 
+
+def wandb_init(args):
+    if args['wandb']['enabled']:
+        if 'id' in args['wandb']:
+            wandb.init(project=args['wandb']['project'], entity=args['wandb']['entity'], 
+                    id=args['wandb']['id'], config=args, resume=True)
+        else:
+            id = wandb.util.generate_id()
+            wandb.init(project=args['wandb']['project'], entity=args['wandb']['entity'], id=id, config=args)
+            args['wandb']['id'] = id
+        
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
@@ -111,6 +123,8 @@ def main(rank, args):
         os.makedirs(args['io']['save_path'] + 'checkpoints/')
         latest_checkpoint = None
 
+    wandb_init(args)
+
     if args['verbose']:
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
         print('Model args: ')
@@ -123,15 +137,33 @@ def main(rank, args):
 
     best_checkpoint = get_best_checkpoint(args['io']['save_path'], map_location=map_location)['model_state_dict']
     model.load_state_dict(best_checkpoint)
-    compute_factorization_metrics(model, tokenizer, device, args)
+    compute_factorization_metrics(model, tokenizer, device, args, args['wandb']['enabled'])
 
     if args['multi_gpu']:
         cleanup()
 
-    # Ability to resume during training... data set is small now! will be important!!!
-    # Deal with the fact that I really want to know if a number is prime but sometimes I don't have access to it.... :(
-
 if __name__ == "__main__":
+    """
+    TODO: (no particular order)
+    * How do I add a json to the summary for WANDB?
+    * Multi Beam Metrics (i.e. n_beams in args, produce metrics file for each beam size)
+    * Double check to make sure all of the metrics are working properly!!! (iirc there's one that's broken :()    
+    * Different types of positional embeddings:
+        * Rotary Embeddings
+        * Alibi
+        * Adding positional embeddings at every step
+        * Adding positional embeddings to query and key only, not value
+        * Concatenating positional embeddings, not adding them
+        * Relative positional encodings (like what T5 uses)
+
+    * See about using WANDB sweeps
+    * Come up with a small model/dataset that can be trained in ~5 min or something 
+
+    * Is there any benefit to using lightning?
+        * I think for multi gpu support it might be useful, but everyhting else I've/would like to do myself
+    * Set a seed for model training (what's the best way to handle resuming training? If we resume from training on 
+            many numbers (i.e. less than 1 epoch), we don't want to start from the beginning)
+    """
     parser = ArgumentParser()
     parser.add_argument('--config', required=True)
     parser.add_argument('--resume_training', action='store_true', default=False)

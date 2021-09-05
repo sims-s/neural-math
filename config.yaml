@@ -1,7 +1,6 @@
----
 'data':
-  'train_path' : 'data/train_data_2^18.npy'
-  'test_path' : 'data/test_data_2^18.npy'
+  'train_path' : 'data/train_data_2^16.npy'
+  'test_path' : 'data/test_data_2^16.npy'
   'base' : 24 # base the number is factored in
 
 'model_args':
@@ -11,9 +10,12 @@
   'dim_feedforward' : 512
   'dropout' : .05
   'shared_embeddings' : True
-  'scale_embeddings' : False
+  'scale_embeddings' : True
   'learn_positional_encoding' : False
   'max_decode_size' : 64
+  'repeat_positional_encoding' : True
+  'positional_encoding_query_key_only' : True
+  'norm_first' : False
 
 'optimizer':
   'type' : 'adam'
@@ -40,7 +42,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/base_24_2^18/'
+  'save_path' : './models/base_24/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -52,7 +54,12 @@
   'temperature' : 1.0
 
 'multi_gpu' : 'auto'
-
-
-
 'verbose' : True
+
+'wandb' : 
+  'enabled' : True
+  'project' : 'integer-factorization'
+  'entity' : 'sims-s'
+  'watch_args' : 
+    'log' : 'all'
+    'log_freq' : 50

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import yaml
 import os
+import wandb
 from scheduler import get_linear_schedule_with_warmup
 
 def get_scheduler(args, optimizer):
@@ -91,14 +92,17 @@ def checkpoint(model, optimizer, test_loader, tokenizer, loss_func, device, trai
         loss_df = pd.DataFrame.from_records(loss_hist, columns = ['step', 'train_loss', 'test_loss'])
         loss_df.to_csv(args['io']['save_path'] + 'loss_hist.csv', index=False)
 
+        if args['wandb']['enabled']:
+            wandb.log({'train_loss' : train_loss, 'test_loss' : test_loss, 'step' : global_step})
+
         torch.save({'model_state_dict' : model.state_dict(), 
                     'opt_state_dict': optimizer.state_dict(), 
+                    'scheduler_state_dict' : scheduler.state_dict(),
                     'train_loss' : train_loss, 
                     'test_loss' : test_loss,
                     'args': args, 
                     'global_step' : global_step,
-                    'global_batches' : global_batches,
-                    'scheduler_state_dict' : scheduler.state_dict()},
+                    'global_batches' : global_batches,},
                     '%s/%d_%.4f.pt'%(os.path.join(args['io']['save_path'], 'checkpoints'), global_step, test_loss))
 
     return loss_hist
@@ -116,6 +120,9 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
     
     loss_func = nn.CrossEntropyLoss()
     pbar = tqdm(total = args['scheduler']['nb_steps'], leave=False)
+    if args['wandb']['enabled']:
+        wandb.watch(model, criterion=loss_func, **args['wandb']['watch_args'])
+
     if latest_checkpoint is None:
         global_loss_hist = []
         global_step = 0

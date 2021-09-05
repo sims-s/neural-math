@@ -2,3 +2,4 @@
 *.pkl
 notebooks/.ipynb_checkpoints/
 data/
+wandb/

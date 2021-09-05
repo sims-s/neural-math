@@ -7,9 +7,10 @@ from utils import load_json, save_json, load_data_file
 from optimization_utils import test_on_loader
 from data_utils import prepare_dataloader
 import torch.autograd.profiler as profiler
+import wandb
 
 
-def compute_factorization_metrics(model, tokenizer, device, args):
+def compute_factorization_metrics(model, tokenizer, device, args, use_wandb=False):
     if args['verbose']:
         print('Computing metrics...')
     
@@ -28,6 +29,8 @@ def compute_factorization_metrics(model, tokenizer, device, args):
     metrics['test_loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device, args['optimizer']['gradient_accumulation_steps'])
     metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
     save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
+    # if use_wandb:
+    #     wandb.run.summary['metrics'] = metrics
 
 
 def form_factor_df(model, tokenizer, device, base, numbers, max_decode_size, n_beams=1, temperature=1.0, max_num=-1, postprocess_minimal=False):
