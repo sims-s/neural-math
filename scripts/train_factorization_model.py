@@ -94,7 +94,7 @@ def cleanup():
 def run(f, world_size, args):
     mp.spawn(f, args=(world_size, args), nprocs=world_size, join=True)
 
-def main(rank, args):
+def main(rank, args):   
     if torch.cuda.device_count() > 1 and args['multi_gpu']:
         setup(rank, torch.cuda.device_count())
         device = rank
@@ -145,16 +145,26 @@ def main(rank, args):
 if __name__ == "__main__":
     """
     TODO: (no particular order)
+    * Model seems to be very sensitive to changes in initializations:
+        * MultiHeadedAttention.out_proj
+        * Initializing with xavier uniform (weights) and 0 (bias) reduces accuracy (on small problem) by 10-12%....
     * How do I add a json to the summary for WANDB?
     * Multi Beam Metrics (i.e. n_beams in args, produce metrics file for each beam size)
-    * Double check to make sure all of the metrics are working properly!!! (iirc there's one that's broken :()    
     * Different types of positional embeddings:
         * Rotary Embeddings
         * Alibi
-        * Adding positional embeddings at every step
-        * Adding positional embeddings to query and key only, not value
         * Concatenating positional embeddings, not adding them
-        * Relative positional encodings (like what T5 uses)
+        * Relative positional encodings (what transfomrer XL uses)
+    
+    * Different initializations:
+        * embeddings
+        * WEIGHTS IN ATTENTION SEEM IMPORTANT!!!
+
+    * Shared weights between layers in transformer
+    
+    * In generate_data script, create a larger # test set
+        * When we evaulate the model, also evalute on this test set! 
+        * Check to make sure data_loc arg actually works in evaluate script
 
     * See about using WANDB sweeps
     * Come up with a small model/dataset that can be trained in ~5 min or something 
@@ -163,6 +173,7 @@ if __name__ == "__main__":
         * I think for multi gpu support it might be useful, but everyhting else I've/would like to do myself
     * Set a seed for model training (what's the best way to handle resuming training? If we resume from training on 
             many numbers (i.e. less than 1 epoch), we don't want to start from the beginning)
+    * Remove multi gpu spport in train script - will eventually hopefully move to lightning for this
     """
     parser = ArgumentParser()
     parser.add_argument('--config', required=True)

@@ -52,7 +52,7 @@ def form_factor_df(model, tokenizer, device, base, numbers, max_decode_size, n_b
 
 def compute_metrics(factor_df):
     metrics = {}
-    grouped_by_num = factor_df.groupby('target_num')
+    grouped_by_num = factor_df.groupby('input_num')
     metrics['correct'] = grouped_by_num.agg({
         'correct_product' : 'any',
         'correct_factorization' : 'any'
@@ -65,44 +65,45 @@ def compute_metrics(factor_df):
     
     factor_df['log_prob_decile'] = pd.qcut(factor_df['log_prob'], q=10).apply(str)
     metrics['by_prob'] = factor_df.groupby('log_prob_decile').agg({
+        'beam_idx' : 'size',
         'correct_product': 'mean',
         'correct_factorization' : 'mean',
         'percent_prime_factors_pred' : 'mean',
-    }).astype(float).to_dict()
+    }).rename({'beam_idx' : 'group_size'}, axis=1).astype(float).to_dict()
     
     # Things about the target, we want to take the first one of b/c we're gruping by it. Otherwise, we want all of them as a list
-    grouped_by_num = grouped_by_num.agg({k: 'first' if ('target' in k or 'input' in k) else list for k in list(factor_df) if not k=='target_num'}).reset_index()
-    mean_size_product_factorization = ['correct_product_mean', 'correct_product_size', 'correct_factorization_mean', 'correct_factorization_size']
+    grouped_by_num = grouped_by_num.agg({k: 'first' if ('target' in k or 'input' in k) else list for k in list(factor_df) if not k=='input_num'}).reset_index()
+    mean_size_product_factorization = ['group_size', 'correct_product_mean', 'correct_factorization_mean']
     
-    metrics['by_n_target_factors'] = grouped_by_num.groupby('n_target_factors').agg({
-        'correct_product' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size'],
-        'correct_factorization' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size']
+    metrics['by_num_target_factors'] = grouped_by_num.groupby('num_target_factors').agg({
+        'correct_product' : ['size', lambda x: pd.Series([np.mean([any(y) for y in x])])],
+        'correct_factorization' : lambda x: pd.Series([np.mean([any(y) for y in x])])
     })
-    metrics['by_n_target_factors'].columns = mean_size_product_factorization
-    metrics['by_n_target_factors'] = metrics['by_n_target_factors'].to_dict()
+    metrics['by_num_target_factors'].columns = mean_size_product_factorization
+    metrics['by_num_target_factors'] = metrics['by_num_target_factors'].to_dict()
 
-    grouped_by_num['number_decile'] = pd.qcut(grouped_by_num['target_num'], q=10).apply(str)
-    metrics['by_target_number'] = grouped_by_num.groupby('number_decile').agg({
-        'correct_product' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size'],
-        'correct_factorization' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size']
+    grouped_by_num['number_decile'] = pd.qcut(grouped_by_num['input_num'], q=10).apply(str)
+    metrics['by_input_num'] = grouped_by_num.groupby('number_decile').agg({
+        'correct_product' : ['size', lambda x: pd.Series([np.mean([any(y) for y in x])])],
+        'correct_factorization' : lambda x: pd.Series([np.mean([any(y) for y in x])])
     })
-    metrics['by_target_number'].columns = mean_size_product_factorization
-    metrics['by_target_number'] = metrics['by_target_number'].to_dict()
+    metrics['by_input_num'].columns = mean_size_product_factorization
+    metrics['by_input_num'] = metrics['by_input_num'].to_dict()
 
-    metrics['pred_same_as_target_beam_0'] = grouped_by_num.groupby(['target_is_prime', 'pred_same_as_target']).agg({
-        'correct_product' : [lambda x: pd.Series([np.mean([y[0] for y in x])]), 'size'],
-        'correct_factorization' : [lambda x: pd.Series([np.mean([y[0] for y in x])]), 'size']
+    metrics['pred_same_as_input_beam_0'] = grouped_by_num.groupby(['input_is_prime', 'pred_same_as_input']).agg({
+        'correct_product' : ['size', lambda x: pd.Series([np.mean([y[0] for y in x])])],
+        'correct_factorization' : lambda x: pd.Series([np.mean([y[0] for y in x])])
     })
-    metrics['pred_same_as_target_beam_0'].columns = mean_size_product_factorization
-    metrics['pred_same_as_target_beam_0'] = metrics['pred_same_as_target_beam_0'].reset_index().to_dict(orient='index')
+    metrics['pred_same_as_input_beam_0'].columns = mean_size_product_factorization
+    metrics['pred_same_as_input_beam_0'] = metrics['pred_same_as_input_beam_0'].reset_index().to_dict(orient='index')
 
-    nonprime_df = grouped_by_num[~grouped_by_num['target_is_prime']]
+    nonprime_df = grouped_by_num[~grouped_by_num['input_is_prime']]
     nonprime_df['min_factor_decile'] = pd.qcut(nonprime_df['min_target_prime_factor_if_composite'], q=10, duplicates='drop').apply(str)
-    metrics['by_min_factor'] = nonprime_df.groupby('min_factor_decile').agg({
-        'correct_product' : [lambda x: pd.Series([np.mean([any(y) for y in x])]), 'size'],
-        'correct_factorization' : [lambda x: pd.Series([np.mean([y[0] for y in x])]), 'size']
+    metrics['by_min_factor_composite_only'] = nonprime_df.groupby('min_factor_decile').agg({
+        'correct_product' : ['size', lambda x: pd.Series([np.mean([any(y) for y in x])])],
+        'correct_factorization' : lambda x: pd.Series([np.mean([y[0] for y in x])])
     })
-    metrics['by_min_factor'].columns = mean_size_product_factorization
-    metrics['by_min_factor'] = metrics['by_min_factor'].reset_index().to_dict(orient='index')
+    metrics['by_min_factor_composite_only'].columns = mean_size_product_factorization
+    metrics['by_min_factor_composite_only'] = metrics['by_min_factor_composite_only'].reset_index().to_dict(orient='index')
     
     return metrics

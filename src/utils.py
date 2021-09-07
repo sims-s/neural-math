@@ -80,7 +80,7 @@ def update_args_with_cli(args, input_args):
 
 def backfill_args(args):
     # Add default arguments for things that werne't features when the model was run
-    args['metrics']['temperature'] = 1
+    
     return args
 
 

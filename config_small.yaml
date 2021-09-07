@@ -1,7 +1,7 @@
 'data':
-  'train_path' : 'data/train_data_2^14.npy'
-  'test_path' : 'data/test_data_2^14.npy'
-  'base' : 2
+  'train_path' : 'data/train_data_2^13.npy'
+  'test_path' : 'data/test_data_2^13.npy'
+  'base' : 30
 
 'model_args':
   'embed_dim' : 128
@@ -26,7 +26,7 @@
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
-  'n_warmup_steps' : 5000
+  'n_warmup_steps' : 2400
   'nb_epochs' : 50
   'max_steps' : -1
 
@@ -39,8 +39,8 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/update_pe_test/'
-  'checkpoint_every' : 2500
+  'save_path' : './models/base_30_v6/'
+  'checkpoint_every' : 1000
   'evaluate_every' : 1
   'evaluate_final' : True
 

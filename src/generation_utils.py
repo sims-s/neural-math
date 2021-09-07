@@ -71,7 +71,8 @@ def extract_factors(factor_list):
         
 def postprocess(factor_list, log_prob, base_10_number, base, beam_idx, tokenizer, postprocess_minimal):
     information = {
-        'target_num' : base_10_number,
+        'input_num' : base_10_number,
+            'model_input' : [str(c) for c in data_utils.form_input(base_10_number, base)],
         'beam_idx' : beam_idx,
         'log_prob' : log_prob.item(),
     }
@@ -84,6 +85,8 @@ def postprocess(factor_list, log_prob, base_10_number, base, beam_idx, tokenizer
         factors = [base2dec([int(digit) for digit in num], base) for num in factor_list]
     except ValueError:
         factors = []
+        
+    information['pred_str'] = tokenized
     information['pred_factor_list'] = factors
 
     if len(information['pred_factor_list']) > 0:
@@ -91,30 +94,23 @@ def postprocess(factor_list, log_prob, base_10_number, base, beam_idx, tokenizer
     else:
         information['product'] = np.nan
 
+    information['num_pred_factors'] = len(information['pred_factor_list'])
+    information['num_prime_factors_pred'] = np.sum([isprime(f) for f in factors])
+    information['percent_prime_factors_pred'] = information['num_prime_factors_pred'] / information['num_pred_factors']
+
     information['correct_product'] = information['product']==base_10_number
     information['correct_factorization'] = information['correct_product'] & all([isprime(n) for n in information['pred_factor_list']])
+    information['pred_same_as_input'] = ' '.join(information['model_input'])==information['pred_str'].replace('_', '').strip()
 
 
     if not postprocess_minimal:
-        information['target_is_prime'] = isprime(base_10_number)
-        information['input_string'] = dec2base(base_10_number, base)
-        information['pred_list'] = factor_list
-        information['pred_str'] = tokenized
-        try:
-            information['target_str'] = ' '.join([str(c) for c in data_utils.form_label(base_10_number, base)])
-            information['target_factor_list'] = sum([[k]*v for k, v in factorint(base_10_number).items()], [])
-        except KeyError:
-            information['target_str'] = ''
-            information['target_factor_list'] = ''
-        information['n_target_factors'] = len(information['target_factor_list'])
-
-        information['n_pred_factors'] = len(information['pred_factor_list'])
+        information['input_is_prime'] = isprime(base_10_number)
         
-        
-        information['num_prime_factors_pred'] = np.sum([isprime(f) for f in factors])
-        information['percent_prime_factors_pred'] = information['num_prime_factors_pred'] / information['n_pred_factors']
+        # TODO: data_utils.form_label calls factorint, and so does computation of target_factor_list. Should remove redundant computation
+        information['target_factor_str'] = ' '.join([str(c) for c in data_utils.form_label(base_10_number, base)])
+        information['target_factor_list'] = sum([[k]*v for k, v in factorint(base_10_number).items()], [])
 
-        information['pred_same_as_target'] = len(information['target_factor_list'])==1 and information['target_factor_list']==information['pred_factor_list']
+        information['num_target_factors'] = len(information['target_factor_list'])
 
         information['min_target_prime_factor_if_composite'] = -1 if len(information['target_factor_list'])==1 else min(information['target_factor_list'])
 

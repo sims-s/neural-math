@@ -4,8 +4,8 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.modules.transformer import Transformer
-from attention_utils import MultiheadAttentionAllHeads
+# from torch.nn.modules.transformer import Transformer
+from attention_utils import MultiHeadAttention
 
 class PositionalEncoding(nn.Module):
     # From: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -28,23 +28,6 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
-'''    
-class TransformerEmbedding(nn.Module):
-    def __init__(self, n_tokens, embed_dim, max_decode_size, dropout, scale_embeddings, learn_positional_encoding):
-        super(TransformerEmbedding, self).__init__()
-        self.embed_dim = embed_dim
-        self.embedding = nn.Embedding(n_tokens, embed_dim)
-        self.pe = PositionalEncoding(embed_dim, dropout, max_decode_size, learn_positional_encoding)
-        self.scale_embeddings = scale_embeddings
-        
-    def forward(self, x):
-        if self.scale_embeddings:
-            x = np.sqrt(self.embed_dim) * self.embedding(x).transpose(0,1)
-        else:
-            x = self.embedding(x).transpose(0,1)
-        x = self.pe(x)
-        return x
-'''
 
 class TransformerEmbedding(nn.Module):
     def __init__(self, n_tokens, embed_dim, scale_embeddings):
@@ -84,8 +67,8 @@ class Factorizer(nn.Module):
         
         self.transformer = nn.Transformer(d_model = embed_dim, **kwargs)
         for i in range(self.transformer.decoder.num_layers):
-            self.transformer.decoder.layers[i].self_attn = MultiheadAttentionAllHeads(embed_dim, num_heads, dropout)
-            self.transformer.decoder.layers[i].multihead_attn = MultiheadAttentionAllHeads(embed_dim, num_heads, dropout)
+            self.transformer.decoder.layers[i].self_attn = MultiHeadAttention(embed_dim, num_heads, dropout)
+            self.transformer.decoder.layers[i].multihead_attn = MultiHeadAttention(embed_dim, num_heads, dropout)
         
         self.tokens_out = nn.Linear(embed_dim, n_tokens)
         
@@ -95,7 +78,7 @@ class Factorizer(nn.Module):
     
     def form_subsequence_mask(self, tgt):
         size = tgt.size(0)
-        return (torch.triu(torch.ones(size, size)) == 0).transpose(0,1).to(tgt.device)
+        return torch.triu(torch.ones(size, size), 1).bool().to(tgt.device)
     
     def route_embeddings(self, src_or_tgt, input_type):
         if self.shared_embeddings:
@@ -164,7 +147,7 @@ class Factorizer(nn.Module):
     def decoder_layer_forward_with_attention(self, mod, x, memory, tgt_mask=None, tgt_key_padding_mask=None, mem_mask=None, memory_key_padding_mask=None):
         def _sa_block(x, attn_mask, key_padding_mask):
             q, k, v = self.prepare_embedding_for_attn(x, False)
-            x, attn_weights = mod.self_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask)
+            x, attn_weights = mod.self_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask, need_weights=True)
             return mod.dropout1(x), attn_weights
 
         def _mha_block(x, mem, attn_mask, key_padding_mask):
@@ -180,7 +163,7 @@ class Factorizer(nn.Module):
                 k = mem
                 v = mem
 
-            x, attn_weights = mod.multihead_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask)
+            x, attn_weights = mod.multihead_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask, need_weights=True)
             return mod.dropout2(x), attn_weights
 
         def _ff_block(x):
