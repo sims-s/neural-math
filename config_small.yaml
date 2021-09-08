@@ -11,11 +11,14 @@
   'dropout' : .1
   'shared_embeddings' : True
   'scale_embeddings' : True
-  'learn_positional_encoding' : False
   'max_decode_size' : 64
+  'norm_first' : False
+
+  'learn_positional_encoding' : False
   'repeat_positional_encoding' : True
   'positional_encoding_query_key_only' : True
-  'norm_first' : False
+  'relative_positional_encoding' : True
+  
 
 'optimizer':
   'type' : 'adam'
@@ -39,7 +42,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/base_30_v6/'
+  'save_path' : './models/debug_rel_attn/'
   'checkpoint_every' : 1000
   'evaluate_every' : 1
   'evaluate_final' : True

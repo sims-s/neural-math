@@ -1,20 +1,22 @@
 from os import X_OK
 import numpy as np
 import math
+from numpy.core.numeric import _moveaxis_dispatcher
+from numpy.lib.arraysetops import isin
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # from torch.nn.modules.transformer import Transformer
-from attention_utils import MultiHeadAttention
+from attention_utils import MultiHeadAttention, MultiHeadRelativeAttention
 
 class PositionalEncoding(nn.Module):
     # From: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
-    def __init__(self, d_model, dropout, max_len, learnable):
+    def __init__(self, d_model, dropout, max_len, learnable, pos_offset=0):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
         pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1) + pos_offset
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -46,13 +48,14 @@ class TransformerEmbedding(nn.Module):
 class Factorizer(nn.Module):
     def __init__(self, n_tokens, embed_dim, max_decode_size, shared_embeddings, pad_token_id, scale_embeddings, learn_positional_encoding, 
                 repeat_positional_encoding=False, positional_encoding_query_key_only=False, 
-                norm_first = False, **kwargs):
+                norm_first = False, relative_positional_encoding = False, **kwargs):
         super(Factorizer, self).__init__()
         self.shared_embeddings = shared_embeddings
         self.pad_token_id = pad_token_id
         self.repeat_positional_encoding = repeat_positional_encoding
         self.positional_encoding_query_key_only = positional_encoding_query_key_only
         self.norm_first = norm_first
+        self.relative_positional_encoding = relative_positional_encoding
 
         num_heads = 8 if not 'num_heads' in kwargs else kwargs['num_heads']
         dropout = .1 if not 'dropout' in kwargs else kwargs['dropout']
@@ -63,11 +66,21 @@ class Factorizer(nn.Module):
         else:
             self.embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings)
 
-        self.positional_encoding = PositionalEncoding(embed_dim, dropout, max_decode_size, learn_positional_encoding)
+        if self.relative_positional_encoding:
+            self.positional_encoding = PositionalEncoding(embed_dim, dropout, 2*max_decode_size-1, learn_positional_encoding, -max_decode_size+1)
+        else:
+            self.positional_encoding = PositionalEncoding(embed_dim, dropout, max_decode_size, learn_positional_encoding)
         
         self.transformer = nn.Transformer(d_model = embed_dim, **kwargs)
+        
+        if self.relative_positional_encoding:
+            for i in range(self.transformer.encoder.num_layers):
+                self.transformer.encoder.layers[i].self_attn = MultiHeadRelativeAttention(embed_dim, num_heads, self.positional_encoding, dropout)
         for i in range(self.transformer.decoder.num_layers):
-            self.transformer.decoder.layers[i].self_attn = MultiHeadAttention(embed_dim, num_heads, dropout)
+            if self.relative_positional_encoding:
+                self.transformer.decoder.layers[i].self_attn = MultiHeadRelativeAttention(embed_dim, num_heads, self.positional_encoding, dropout)
+            else:
+                self.transformer.decoder.layers[i].self_attn = MultiHeadAttention(embed_dim, num_heads, dropout)
             self.transformer.decoder.layers[i].multihead_attn = MultiHeadAttention(embed_dim, num_heads, dropout)
         
         self.tokens_out = nn.Linear(embed_dim, n_tokens)
@@ -94,8 +107,12 @@ class Factorizer(nn.Module):
         
         return self.encoder_forward(src, src_key_padding_mask = src_key_padding_mask), src_key_padding_mask
 
-    def prepare_embedding_for_attn(self, emb, is_first_enc_mod):
-        if not self.repeat_positional_encoding and is_first_enc_mod:
+    def prepare_embedding_for_attn(self, emb, is_first_enc_mod, mod_is_relative):
+        if mod_is_relative:
+            q = emb
+            k = emb
+            v = emb
+        elif not self.repeat_positional_encoding and is_first_enc_mod:
             emb_with_pe = self.positional_encoding(emb)
             q = emb_with_pe
             k = emb_with_pe
@@ -117,8 +134,9 @@ class Factorizer(nn.Module):
 
     
     def encoder_mod_forward(self, x, mod, src_mask, src_key_padding_mask, is_first_enc_mod):
+        mod_is_relative = isinstance(mod.self_attn, MultiHeadRelativeAttention)
         def _sa_block(x, src_mask, src_key_padding_mask):
-            q, k, v = self.prepare_embedding_for_attn(x, is_first_enc_mod)
+            q, k, v = self.prepare_embedding_for_attn(x, is_first_enc_mod, mod_is_relative)
             x = mod.self_attn(q, k, v, attn_mask=src_mask, key_padding_mask=src_key_padding_mask, need_weights=False)[0]
             return mod.dropout1(x)
 
@@ -145,13 +163,15 @@ class Factorizer(nn.Module):
         return x
 
     def decoder_layer_forward_with_attention(self, mod, x, memory, tgt_mask=None, tgt_key_padding_mask=None, mem_mask=None, memory_key_padding_mask=None):
+        mod_is_relative_self = isinstance(mod.self_attn, MultiHeadRelativeAttention)
+        mod_is_relative_mha = isinstance(mod.multihead_attn, MultiHeadRelativeAttention)
         def _sa_block(x, attn_mask, key_padding_mask):
-            q, k, v = self.prepare_embedding_for_attn(x, False)
+            q, k, v = self.prepare_embedding_for_attn(x, False, mod_is_relative_self)
             x, attn_weights = mod.self_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask, need_weights=True)
             return mod.dropout1(x), attn_weights
 
         def _mha_block(x, mem, attn_mask, key_padding_mask):
-            if self.repeat_positional_encoding:
+            if not mod_is_relative_mha and self.repeat_positional_encoding:
                 q = self.positional_encoding(x)
                 k = self.positional_encoding(mem)
                 if not self.positional_encoding_query_key_only:
