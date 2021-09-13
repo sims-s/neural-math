@@ -1,7 +1,8 @@
 'data':
   'train_path' : 'data/train_data_2^16.npy'
   'test_path' : 'data/test_data_2^16.npy'
-  'base' : 24 # base the number is factored in
+  'oos_path' : 'data/oos_data_2^16.npy'
+  'base' : 2
 
 'model_args':
   'embed_dim' : 128
@@ -10,12 +11,13 @@
   'dim_feedforward' : 512
   'dropout' : .05
   'shared_embeddings' : True
-  'scale_embeddings' : True
-  'learn_positional_encoding' : False
+  'scale_embeddings' : False
   'max_decode_size' : 64
-  'repeat_positional_encoding' : True
-  'positional_encoding_query_key_only' : True
   'norm_first' : False
+  'learn_positional_encoding' : False
+  'repeat_positional_encoding' : False
+  'positional_encoding_query_key_only' : False
+  'relative_positional_encoding' : False
 
 'optimizer':
   'type' : 'adam'
@@ -40,9 +42,12 @@
   'test' : 
     'batch_size' : 256
     'shuffle' : False
+  'oos' : 
+    'batch_size' : 256
+    'shuffle' : False
 
 'io':
-  'save_path' : './models/base_24/'
+  'save_path' : './models/benchmarks/2^16/baseline/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True

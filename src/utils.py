@@ -59,10 +59,9 @@ def get_last_checkpoint(path, map_location):
     print('Loading model at %s'%chosen_path)
     return torch.load(chosen_path, map_location=map_location)
 
-    
+# TODO: clean this up!!! 
 def update_args_with_cli(args, input_args):
     args['metrics']['max_num'] = input_args.max_num
-    args['metrics']['save_suffix'] = input_args.suffix
     if input_args.n_beams > 0:
         args['metrics']['n_beams'] = input_args.n_beams
     
@@ -71,8 +70,6 @@ def update_args_with_cli(args, input_args):
         args['io']['save_path'] = path[:path.find('checkpoints')]
     else:
         args['io']['save_path'] = input_args.path
-    if input_args.data_loc:
-        args['data']['test_path'] = input_args.data_loc
     if input_args.temperature > 0:
         args['metrics']['temperature'] = input_args.temperature
     args['loader']['test']['num_workers'] = input_args.num_workers

@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import pprint
 import sys
-import wandb
+# import wandb
 sys.path.append('./src/')
 from tokenizer import Tokenizer
 from data_utils import prepare_dataloader
@@ -25,7 +25,8 @@ def get_datasets(args):
         print('Loading data...')
 
     return prepare_dataloader(args['data']['train_path'], args, **args['loader']['train']), \
-           prepare_dataloader(args['data']['test_path'], args, **args['loader']['test'])
+           prepare_dataloader(args['data']['test_path'], args, **args['loader']['test']), \
+           prepare_dataloader(args['data']['oos_path'], args, **args['loader']['oos'])
     
 
 def compute_extra_args(args, tokenizer):
@@ -105,7 +106,7 @@ def main(rank, args):
     tokenizer = Tokenizer(args['data']['base'])
     args = compute_extra_args(args, tokenizer)
 
-    train_loader, test_loader = get_datasets(args)
+    train_loader, test_loader, oos_loader = get_datasets(args)
 
     args = compute_nb_steps(args, train_loader)
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
@@ -130,21 +131,29 @@ def main(rank, args):
         print('Model args: ')
         pprint.pprint(args['model_args'])
 
-    run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, device, args, latest_checkpoint)
+    run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, oos_loader, device, args, latest_checkpoint)
 
     if args['multi_gpu']:
         dist.barrier()
 
     best_checkpoint = get_best_checkpoint(args['io']['save_path'], map_location=map_location)['model_state_dict']
     model.load_state_dict(best_checkpoint)
-    compute_factorization_metrics(model, tokenizer, device, args, args['wandb']['enabled'])
+    compute_factorization_metrics(model, tokenizer, device, args, args['data']['test_path'], 
+                save_suffix='test')
+    compute_factorization_metrics(model, tokenizer, device, args, args['data']['oos_path'], 
+                save_suffix = 'oos')
 
     if args['multi_gpu']:
         cleanup()
 
 if __name__ == "__main__":
     """
+    Test to make sure old version (no relative pe, no repeated pe) make sure results loook same
     TODO: (no particular order)
+        * THEY DON'T GET POSITIONAL ENCODINGS OTHERWISE, AND THEY'RE VERY IMPORTANT!!!!
+    * DOUBLE CHECK TO MAKE SURE THAT RELATIVE POSITIONAL ENCODINGS ARE WORKING PROPERLY!!!
+    * Write some documentation on how the arguments work
+        * also cleanup docuemntation that's on github, becasue it's out of date
     * Model seems to be very sensitive to changes in initializations:
         * MultiHeadedAttention.out_proj
         * Initializing with xavier uniform (weights) and 0 (bias) reduces accuracy (on small problem) by 10-12%....
@@ -154,17 +163,12 @@ if __name__ == "__main__":
         * Rotary Embeddings
         * Alibi
         * Concatenating positional embeddings, not adding them
-        * Relative positional encodings (what transfomrer XL uses)
     
     * Different initializations:
         * embeddings
         * WEIGHTS IN ATTENTION SEEM IMPORTANT!!!
 
     * Shared weights between layers in transformer
-    
-    * In generate_data script, create a larger # test set
-        * When we evaulate the model, also evalute on this test set! 
-        * Check to make sure data_loc arg actually works in evaluate script
 
     * See about using WANDB sweeps
     * Come up with a small model/dataset that can be trained in ~5 min or something 

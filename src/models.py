@@ -26,8 +26,12 @@ class PositionalEncoding(nn.Module):
         else:
             self.register_buffer('pe', pe)
 
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
+    def forward(self, x, pos_offset=0):
+        # print('Positional encodings get called. Input size: ', x.size())
+        # print('overall PE size: ', self.pe.size())
+        # print('PE addition size: ', self.pe[:x.size(0), :].size())
+        x = x + self.pe[pos_offset : x.size(0) + pos_offset, :]
+        # x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
 
@@ -107,17 +111,18 @@ class Factorizer(nn.Module):
         
         return self.encoder_forward(src, src_key_padding_mask = src_key_padding_mask), src_key_padding_mask
 
-    def prepare_embedding_for_attn(self, emb, is_first_enc_mod, mod_is_relative):
+    def prepare_embedding_for_attn(self, emb, is_first_mod, mod_is_relative):
+        # return emb, emb, emb
         if mod_is_relative:
             q = emb
             k = emb
             v = emb
-        elif not self.repeat_positional_encoding and is_first_enc_mod:
+        elif not self.repeat_positional_encoding and is_first_mod:
             emb_with_pe = self.positional_encoding(emb)
             q = emb_with_pe
             k = emb_with_pe
             v = emb_with_pe
-        elif not self.repeat_positional_encoding and not is_first_enc_mod:
+        elif not self.repeat_positional_encoding and not is_first_mod:
             q = emb
             k = emb
             v = emb
@@ -135,6 +140,8 @@ class Factorizer(nn.Module):
     
     def encoder_mod_forward(self, x, mod, src_mask, src_key_padding_mask, is_first_enc_mod):
         mod_is_relative = isinstance(mod.self_attn, MultiHeadRelativeAttention)
+        # print('Call forward on an encoder module')
+        # print('module is first encoder: ', is_first_enc_mod)
         def _sa_block(x, src_mask, src_key_padding_mask):
             q, k, v = self.prepare_embedding_for_attn(x, is_first_enc_mod, mod_is_relative)
             x = mod.self_attn(q, k, v, attn_mask=src_mask, key_padding_mask=src_key_padding_mask, need_weights=False)[0]
@@ -162,16 +169,25 @@ class Factorizer(nn.Module):
             x = self.transformer.encoder.norm(x)
         return x
 
-    def decoder_layer_forward_with_attention(self, mod, x, memory, tgt_mask=None, tgt_key_padding_mask=None, mem_mask=None, memory_key_padding_mask=None):
+    def decoder_layer_forward_with_attention(self, mod, x, memory, tgt_mask=None, tgt_key_padding_mask=None, 
+                                            mem_mask=None, memory_key_padding_mask=None, is_first_dec_mod=False):
         mod_is_relative_self = isinstance(mod.self_attn, MultiHeadRelativeAttention)
-        mod_is_relative_mha = isinstance(mod.multihead_attn, MultiHeadRelativeAttention)
+        # mod_is_relative_mha = isinstance(mod.multihead_attn, MultiHeadRelativeAttention)
         def _sa_block(x, attn_mask, key_padding_mask):
-            q, k, v = self.prepare_embedding_for_attn(x, False, mod_is_relative_self)
+            q, k, v = self.prepare_embedding_for_attn(x, is_first_dec_mod, mod_is_relative_self)
             x, attn_weights = mod.self_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask, need_weights=True)
             return mod.dropout1(x), attn_weights
 
         def _mha_block(x, mem, attn_mask, key_padding_mask):
-            if not mod_is_relative_mha and self.repeat_positional_encoding:
+            if self.relative_positional_encoding:
+                offset = self.positional_encoding.pe.size(0) // 2 + 1
+                q = self.positional_encoding(x, pos_offset=offset)
+                k = self.positional_encoding(mem, pos_offset=offset)
+                if not self.positional_encoding_query_key_only:
+                    v = self.positional_encoding(mem, pos_offset=offset)
+                else:
+                    v = mem
+            elif self.repeat_positional_encoding:
                 q = self.positional_encoding(x)
                 k = self.positional_encoding(mem)
                 if not self.positional_encoding_query_key_only:
@@ -211,10 +227,10 @@ class Factorizer(nn.Module):
         x = tgt
         mem_attn_list = []
         self_attn_list = []
-        for mod in self.transformer.decoder.layers:
+        for i, mod in enumerate(self.transformer.decoder.layers):
             x, self_attn, mem_attn = self.decoder_layer_forward_with_attention(mod, x, memory, tgt_mask=tgt_mask, 
                         tgt_key_padding_mask=tgt_key_padding_mask,
-                        memory_key_padding_mask=memory_key_padding_mask)
+                        memory_key_padding_mask=memory_key_padding_mask, is_first_dec_mod=i==0)
             mem_attn_list.append(mem_attn)
             self_attn_list.append(self_attn)
 
@@ -240,6 +256,25 @@ class Factorizer(nn.Module):
     
         
     def forward(self, src, tgt):
+        # print('src size: ', src.size())
+        # print('tgt size: ', tgt.size())
+        # memory_key_padding_mask = self.form_pad_mask(src)
+        # src = self.route_embeddings(src, 'src')
+        # src = self.positional_encoding(src)
         memory, memory_key_padding_mask = self.encode(src)
+        # memory = self.transformer.encoder(src, src_key_padding_mask =memory_key_padding_mask)
+
+        # tgt_key_padding_mask = self.form_pad_mask(tgt)
+        # tgt = self.route_embeddings(tgt, 'tgt')
+        # tgt = self.positional_encoding(tgt)
+        # tgt_mask = self.form_subsequence_mask(tgt)
+
+
         decoded = self.decode(tgt, memory, memory_key_padding_mask)
+        # output = self.transformer.decoder(tgt, memory, tgt_mask=tgt_mask, 
+                        # tgt_key_padding_mask=tgt_key_padding_mask, memory_key_padding_mask=memory_key_padding_mask)
+
+        # output = output.transpose(0,1)
+        # decoded = self.tokens_out(output)
+        # sys.exit()
         return decoded

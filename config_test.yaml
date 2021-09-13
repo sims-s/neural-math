@@ -1,6 +1,7 @@
 'data':
-  'train_path' : 'data/train_data_2^16.npy'
-  'test_path' : 'data/test_data_2^16.npy'
+  'train_path' : 'data/train_data_2^13.npy'
+  'test_path' : 'data/test_data_2^13.npy'
+  'oos_path' : 'data/oos_data_2^13.npy'
   'base' : 2
 
 'model_args':
@@ -11,11 +12,12 @@
   'dropout' : .1
   'shared_embeddings' : True
   'scale_embeddings' : False
-  'learn_positional_encoding' : False
   'max_decode_size' : 64
+  'norm_first' : False
+  'learn_positional_encoding' : False
   'repeat_positional_encoding' : True
   'positional_encoding_query_key_only' : True
-  'norm_first' : False
+  'relative_positional_encoding' : True
 
 'optimizer':
   'type' : 'adam'
@@ -37,9 +39,12 @@
   'test' : 
     'batch_size' : 256
     'shuffle' : False
+  'oos' : 
+    'batch_size' : 256
+    'shuffle' : False
 
 'io':
-  'save_path' : './models/update_pe_test/'
+  'save_path' : './models/eval_test/'
   'checkpoint_every' : 80
   'evaluate_every' : 1
   'evaluate_final' : True

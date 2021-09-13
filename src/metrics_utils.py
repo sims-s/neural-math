@@ -10,26 +10,35 @@ import torch.autograd.profiler as profiler
 import wandb
 
 
-def compute_factorization_metrics(model, tokenizer, device, args, use_wandb=False):
+def compute_factorization_metrics(model, tokenizer, device, args, data_path = None, save_suffix = ''):
     if args['verbose']:
         print('Computing metrics...')
     
     #TODO should pass argument for path of data instead of just taking test...
-    numbers = np.load(args['data']['test_path'], mmap_mode='r')
+    if data_path:
+        print('read from data path %s'%data_path)
+        numbers = np.load(data_path, mmap_mode='r')
+    else:
+        print('read from test path %s'%args['data']['test_path'])
+        numbers = np.load(args['data']['test_path'], mmap_mode='r')
+    
     if args['verbose']:
         print('Factoring...')
     factor_df = form_factor_df(model, tokenizer, device, args['data']['base'], numbers, args['model_args']['max_decode_size'],
                                args['metrics']['n_beams'], args['metrics']['temperature'], args['metrics']['max_num'])
-    save_suffix = '_%s'%args['metrics']['save_suffix'] if len(args['metrics']['save_suffix']) > 0 else ''
+    if save_suffix:
+        save_suffix = '_%s'%save_suffix
+    else:
+        save_suffix = '_%s'%args['metrics']['save_suffix'] if len(args['metrics']['save_suffix']) > 0 else ''
     factor_df.to_csv(args['io']['save_path'] + 'factor_df%s.csv'%save_suffix, index=False)
-    factor_df.to_pickle(args['io']['save_path'] + 'factor_df%s.pkl'%save_suffix)
+    # factor_df.to_pickle(args['io']['save_path'] + 'factor_df%s.pkl'%save_suffix)
     metrics = compute_metrics(factor_df)
     # Add test loss to metrics
     loader = prepare_dataloader(args['data']['test_path'], args, **args['loader']['test'])
-    metrics['test_loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device, args['optimizer']['gradient_accumulation_steps'])
+    metrics['test_loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device)
     metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
     save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
-    # if use_wandb:
+    # if args['wandb']['enabled']:
     #     wandb.run.summary['metrics'] = metrics
 
 

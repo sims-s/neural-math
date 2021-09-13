@@ -1,25 +1,24 @@
 'data':
   'train_path' : 'data/train_data_2^13.npy'
   'test_path' : 'data/test_data_2^13.npy'
-  'base' : 30
+  'oos_path' : 'data/oos_data_2^13.npy'
+  'base' : 2
 
 'model_args':
   'embed_dim' : 128
   'num_encoder_layers' : 6
   'num_decoder_layers' : 6
   'dim_feedforward' : 512
-  'dropout' : .1
+  'dropout' : .05
   'shared_embeddings' : True
-  'scale_embeddings' : True
+  'scale_embeddings' : False
   'max_decode_size' : 64
   'norm_first' : False
-
   'learn_positional_encoding' : False
-  'repeat_positional_encoding' : True
-  'positional_encoding_query_key_only' : True
-  'relative_positional_encoding' : True
+  'repeat_positional_encoding' : False
+  'positional_encoding_query_key_only' : False
+  'relative_positional_encoding' : False
   
-
 'optimizer':
   'type' : 'adam'
   'opt_args' : 
@@ -29,7 +28,7 @@
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
-  'n_warmup_steps' : 2400
+  'n_warmup_steps' : 5000
   'nb_epochs' : 50
   'max_steps' : -1
 
@@ -40,9 +39,12 @@
   'test' : 
     'batch_size' : 256
     'shuffle' : False
+  'oos' : 
+    'batch_size' : 256
+    'shuffle' : False
 
 'io':
-  'save_path' : './models/debug_rel_attn/'
+  'save_path' : './models/benchmarks/2^13/double_check/'
   'checkpoint_every' : 1000
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -63,5 +65,3 @@
   'watch_args' : 
     'log' : 'all'
     'log_freq' : 50
-
-
