@@ -83,7 +83,7 @@ class MultiHeadAttention(nn.Module):
         else:
             return output
 
-
+# Adapted from https://github.com/RobertCsordas/transformer_generalization/blob/38f2734f5dcad331d4a9658b73b33889ce607c87/layers/transformer/multi_head_relative_pos_attention.py#L51
 class MultiHeadRelativeAttention(nn.Module):
     def __init__(self, embed_dim, num_heads, pe_mod, dropout=0., bias=True):
         super(MultiHeadRelativeAttention, self).__init__()
@@ -134,8 +134,7 @@ class MultiHeadRelativeAttention(nn.Module):
         return pe_weight.narrow(0, lower, size)
 
     def add_head_specific_bias(self, data, bias):
-        return (data.view(-1, bias.shape[0], *data.shape[1:]) + bias.unsqueeze(1).type_as(data)).view_as(data) \
-               if bias is not None else data
+        return (data.view(-1, bias.shape[0], *data.shape[1:]) + bias.unsqueeze(1).type_as(data)).view_as(data)
 
     def _shift(self, posmat: torch.Tensor) -> torch.Tensor:
         # Slice out a matrix diagonally. Each successive row is sliced one position to the left compared.

@@ -61,7 +61,8 @@ def get_last_checkpoint(path, map_location):
 
 # TODO: clean this up!!! 
 def update_args_with_cli(args, input_args):
-    args['metrics']['max_num'] = input_args.max_num
+    if input_args.max_num > 0:
+        args['metrics']['max_num'] = input_args.max_num
     if input_args.n_beams > 0:
         args['metrics']['n_beams'] = input_args.n_beams
     

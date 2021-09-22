@@ -2,7 +2,7 @@
   'train_path' : 'data/train_data_2^16.npy'
   'test_path' : 'data/test_data_2^16.npy'
   'oos_path' : 'data/oos_data_2^16.npy'
-  'base' : 2
+  'base' : 30
 
 'model_args':
   'embed_dim' : 128
@@ -12,12 +12,13 @@
   'dropout' : .05
   'shared_embeddings' : True
   'scale_embeddings' : False
+  'scale_embeddings_at_init' : False
   'max_decode_size' : 64
   'norm_first' : False
   'learn_positional_encoding' : False
   'repeat_positional_encoding' : False
   'positional_encoding_query_key_only' : False
-  'relative_positional_encoding' : False
+  'relative_positional_encoding' : True
 
 'optimizer':
   'type' : 'adam'
@@ -47,7 +48,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/benchmarks/2^16/baseline/'
+  'save_path' : './models/debugging_relative_pe/take_1/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True

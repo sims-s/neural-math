@@ -12,12 +12,13 @@
   'dropout' : .1
   'shared_embeddings' : True
   'scale_embeddings' : False
+  'scale_embeddings_at_init' : False
   'max_decode_size' : 64
   'norm_first' : False
   'learn_positional_encoding' : False
   'repeat_positional_encoding' : True
-  'positional_encoding_query_key_only' : True
-  'relative_positional_encoding' : True
+  'positional_encoding_query_key_only' : False
+  'relative_positional_encoding' : False
 
 'optimizer':
   'type' : 'adam'

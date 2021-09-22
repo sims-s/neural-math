@@ -12,10 +12,11 @@
   'dropout' : .05
   'shared_embeddings' : True
   'scale_embeddings' : False
+  'scale_embeddings_at_init' : False
   'max_decode_size' : 64
   'norm_first' : False
   'learn_positional_encoding' : False
-  'repeat_positional_encoding' : False
+  'repeat_positional_encoding' : True
   'positional_encoding_query_key_only' : False
   'relative_positional_encoding' : False
   
@@ -44,7 +45,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/benchmarks/2^13/double_check/'
+  'save_path' : './models/benchmarks/2^13/baseline_repeat_pos_enc_no_x2_dec_tgt/'
   'checkpoint_every' : 1000
   'evaluate_every' : 1
   'evaluate_final' : True

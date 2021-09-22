@@ -1,13 +1,14 @@
 from os import X_OK
 import numpy as np
 import math
-from numpy.core.numeric import _moveaxis_dispatcher
-from numpy.lib.arraysetops import isin
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # from torch.nn.modules.transformer import Transformer
 from attention_utils import MultiHeadAttention, MultiHeadRelativeAttention
+import sys
+sys.path.append('src/transformer_generalization/layers/transformer/')
+from multi_head_relative_pos_attention import FixedRelativeMultiheadAttention
 
 class PositionalEncoding(nn.Module):
     # From: https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -36,23 +37,35 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerEmbedding(nn.Module):
-    def __init__(self, n_tokens, embed_dim, scale_embeddings):
+    def __init__(self, n_tokens, embed_dim, scale_embeddings, scale_embeddings_at_init):
         super(TransformerEmbedding, self).__init__()
         self.embed_dim = embed_dim
         self.embedding = nn.Embedding(n_tokens, embed_dim)
-        self.scale_embeddings = scale_embeddings
+        if scale_embeddings_at_init:
+            self.embedding.weight.data = self.embedding.weight * math.sqrt(self.embed_dim)
+        self.scale_embeddings_realtime = scale_embeddings and not scale_embeddings_at_init
 
     def forward(self, x):
         embedded = self.embedding(x)
-        if self.scale_embeddings:
+        if self.scale_embeddings_realtime:
             embedded = embedded * math.sqrt(self.embed_dim)
         return embedded.transpose(0,1)
 
 
 class Factorizer(nn.Module):
-    def __init__(self, n_tokens, embed_dim, max_decode_size, shared_embeddings, pad_token_id, scale_embeddings, learn_positional_encoding, 
-                repeat_positional_encoding=False, positional_encoding_query_key_only=False, 
-                norm_first = False, relative_positional_encoding = False, **kwargs):
+    def __init__(self,  n_tokens, 
+                        embed_dim, 
+                        pad_token_id, 
+                        max_decode_size=64, 
+                        shared_embeddings=True,
+                        scale_embeddings=False,
+                        scale_embeddings_at_init=False, 
+                        learn_positional_encoding=False, 
+                        repeat_positional_encoding=False, 
+                        positional_encoding_query_key_only=False, 
+                        norm_first = False, 
+                        relative_positional_encoding = False,
+                         **kwargs):
         super(Factorizer, self).__init__()
         self.shared_embeddings = shared_embeddings
         self.pad_token_id = pad_token_id
@@ -65,10 +78,10 @@ class Factorizer(nn.Module):
         dropout = .1 if not 'dropout' in kwargs else kwargs['dropout']
 
         if not shared_embeddings:
-            self.src_embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings)
-            self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings)
+            self.src_embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings, scale_embeddings_at_init)
+            self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings, scale_embeddings_at_init)
         else:
-            self.embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings)
+            self.embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings, scale_embeddings_at_init)
 
         if self.relative_positional_encoding:
             self.positional_encoding = PositionalEncoding(embed_dim, dropout, 2*max_decode_size-1, learn_positional_encoding, -max_decode_size+1)
@@ -112,7 +125,6 @@ class Factorizer(nn.Module):
         return self.encoder_forward(src, src_key_padding_mask = src_key_padding_mask), src_key_padding_mask
 
     def prepare_embedding_for_attn(self, emb, is_first_mod, mod_is_relative):
-        # return emb, emb, emb
         if mod_is_relative:
             q = emb
             k = emb
@@ -180,15 +192,21 @@ class Factorizer(nn.Module):
 
         def _mha_block(x, mem, attn_mask, key_padding_mask):
             if self.relative_positional_encoding:
-                offset = self.positional_encoding.pe.size(0) // 2 + 1
-                q = self.positional_encoding(x, pos_offset=offset)
-                k = self.positional_encoding(mem, pos_offset=offset)
-                if not self.positional_encoding_query_key_only:
-                    v = self.positional_encoding(mem, pos_offset=offset)
-                else:
-                    v = mem
+                q = x
+                k = mem
+                v = mem
+                # offset = self.positional_encoding.pe.size(0) // 2 + 1
+                # q = self.positional_encoding(x, pos_offset=offset)
+                # k = self.positional_encoding(mem, pos_offset=offset)
+                # if not self.positional_encoding_query_key_only:
+                #     v = self.positional_encoding(mem, pos_offset=offset)
+                # else:
+                #     v = mem
             elif self.repeat_positional_encoding:
-                q = self.positional_encoding(x)
+                # IN RETROSPECT, I THINK THIS IS WRONG? BUT I NEED TO DO A COMPARISON
+                # don't repositionally encode the query, since it already has p.e.s from self attn layer?
+                # q = self.positional_encoding(x)
+                q = x
                 k = self.positional_encoding(mem)
                 if not self.positional_encoding_query_key_only:
                     v = self.positional_encoding(mem)
@@ -256,25 +274,7 @@ class Factorizer(nn.Module):
     
         
     def forward(self, src, tgt):
-        # print('src size: ', src.size())
-        # print('tgt size: ', tgt.size())
-        # memory_key_padding_mask = self.form_pad_mask(src)
-        # src = self.route_embeddings(src, 'src')
-        # src = self.positional_encoding(src)
         memory, memory_key_padding_mask = self.encode(src)
-        # memory = self.transformer.encoder(src, src_key_padding_mask =memory_key_padding_mask)
-
-        # tgt_key_padding_mask = self.form_pad_mask(tgt)
-        # tgt = self.route_embeddings(tgt, 'tgt')
-        # tgt = self.positional_encoding(tgt)
-        # tgt_mask = self.form_subsequence_mask(tgt)
-
-
         decoded = self.decode(tgt, memory, memory_key_padding_mask)
-        # output = self.transformer.decoder(tgt, memory, tgt_mask=tgt_mask, 
-                        # tgt_key_padding_mask=tgt_key_padding_mask, memory_key_padding_mask=memory_key_padding_mask)
 
-        # output = output.transpose(0,1)
-        # decoded = self.tokens_out(output)
-        # sys.exit()
         return decoded
