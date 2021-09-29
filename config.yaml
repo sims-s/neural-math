@@ -19,6 +19,7 @@
   'repeat_positional_encoding' : False
   'positional_encoding_query_key_only' : False
   'relative_positional_encoding' : True
+  # 'debugging_mode' : False
 
 'optimizer':
   'type' : 'adam'
@@ -46,9 +47,8 @@
   'oos' : 
     'batch_size' : 256
     'shuffle' : False
-
 'io':
-  'save_path' : './models/debugging_relative_pe/take_1/'
+  'save_path' : './models/baseline_base_30_relative_pe/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -63,7 +63,7 @@
 'verbose' : True
 
 'wandb' : 
-  'enabled' : True
+  'enabled' : False
   'project' : 'integer-factorization'
   'entity' : 'sims-s'
   'watch_args' : 

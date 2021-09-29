@@ -95,7 +95,8 @@ def cleanup():
 def run(f, world_size, args):
     mp.spawn(f, args=(world_size, args), nprocs=world_size, join=True)
 
-def main(rank, args):   
+def main(rank, args):
+    
     if torch.cuda.device_count() > 1 and args['multi_gpu']:
         setup(rank, torch.cuda.device_count())
         device = rank
@@ -130,7 +131,6 @@ def main(rank, args):
         print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
         print('Model args: ')
         pprint.pprint(args['model_args'])
-
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, oos_loader, device, args, latest_checkpoint)
 
     if args['multi_gpu']:
