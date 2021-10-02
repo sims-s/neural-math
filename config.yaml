@@ -17,9 +17,10 @@
   'norm_first' : False
   'learn_positional_encoding' : False
   'repeat_positional_encoding' : False
-  'positional_encoding_query_key_only' : False
+  'positional_encoding_query_key_only' : True
   'relative_positional_encoding' : True
-  # 'debugging_mode' : False
+  'extra_positional_encoding_relative_decoder_mha' : True
+  'attn_weight_xavier_init_constant' : .5
 
 'optimizer':
   'type' : 'adam'
@@ -48,7 +49,7 @@
     'batch_size' : 256
     'shuffle' : False
 'io':
-  'save_path' : './models/baseline_base_30_relative_pe/'
+  'save_path' : './models/baseline_relative_pe_base_30_extra_2/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -59,7 +60,6 @@
   'save_suffix' : ''
   'temperature' : 1.0
 
-'multi_gpu' : 'auto'
 'verbose' : True
 
 'wandb' : 

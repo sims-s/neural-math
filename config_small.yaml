@@ -56,7 +56,7 @@
   'save_suffix' : ''
   'temperature' : 1.0
 
-'multi_gpu' : 'auto'
+
 'verbose' : True
 
 'wandb' : 

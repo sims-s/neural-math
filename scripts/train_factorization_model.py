@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from torch._C import Value
 import yaml
 import os
 import torch
@@ -8,17 +9,13 @@ import pprint
 import sys
 import wandb
 sys.path.append('./src/')
+from scheduler import get_linear_schedule_with_warmup
 from tokenizer import Tokenizer
 from data_utils import prepare_dataloader
 from models import Factorizer
-from optimization_utils import run_training, get_scheduler
+from optimization_utils import run_training
 from metrics_utils import compute_factorization_metrics
 from utils import get_best_checkpoint, get_last_checkpoint
-
-import torch.multiprocessing as mp
-from torch.nn.parallel import DistributedDataParallel as DDP
-import torch.distributed as dist
-
 
 def get_datasets(args):
     if args['verbose']:
@@ -35,7 +32,6 @@ def compute_extra_args(args, tokenizer):
     args['tokenizer'] = {}
     args['tokenizer']['n_tokens'] = len(tokenizer)
     args['tokenizer']['pad_token_id'] = tokenizer.encode('_')[0]
-    args['multi_gpu'] = torch.cuda.device_count() > 1 and args['multi_gpu']
     return args
 
 
@@ -44,8 +40,6 @@ def get_model(args, device):
                         pad_token_id = args['tokenizer']['pad_token_id'],
                          **args['model_args'])
     model.to(device)
-    if args['multi_gpu']:
-        model = DDP(model, device_ids=[device])
     return model
 
 def get_optimizer(args, model):
@@ -54,6 +48,14 @@ def get_optimizer(args, model):
     else:
         raise ValueError('Only using adam right now')
     return opt
+
+def get_scheduler(args, optimizer):
+    # linear_schedule_with_warmup
+    if args['scheduler']['type']=='linear_schedule_with_warmup':
+        scheduler = get_linear_schedule_with_warmup(optimizer, args['scheduler']['n_warmup_steps'], args['scheduler']['nb_steps'])
+    else:
+        raise ValueError('only using linear_schedule_with_warmup right now')
+    return scheduler
 
 
 def get_model_opt_scheduler(args, device):
@@ -72,6 +74,24 @@ def compute_nb_steps(args, train_loader):
     return args
 
 
+def create_or_load_save_dir(args, model, optimizer, scheduler, map_location):
+    checkpoint_dir = os.path.join(args['io']['save_path'], 'checkpoints')
+    if os.path.exists(checkpoint_dir) and len(os.listdir(checkpoint_dir)) > 1 and not args['resume_training']:
+        raise ValueError("Save path %s already exists, but not resuming training. Add '--resume_training' to arguments to resume training"%args['io']['save_path'])
+    elif args['resume_training']:
+        latest_checkpoint = get_last_checkpoint(args['io']['save_path'], map_location)
+        if latest_checkpoint:
+            model.load_state_dict(latest_checkpoint['model_state_dict'])
+            optimizer.load_state_dict(latest_checkpoint['opt_state_dict'])
+            scheduler.load_state_dict(latest_checkpoint['scheduler_state_dict'])
+    else:
+        os.makedirs(args['io']['save_path'], exist_ok=True)
+        os.makedirs(args['io']['save_path'] + 'checkpoints/', exist_ok=True)
+        latest_checkpoint = None
+    
+    return model, optimizer, scheduler, latest_checkpoint
+
+
 def wandb_init(args):
     if args['wandb']['enabled']:
         if 'id' in args['wandb']:
@@ -81,29 +101,41 @@ def wandb_init(args):
             id = wandb.util.generate_id()
             wandb.init(project=args['wandb']['project'], entity=args['wandb']['entity'], id=id, config=args)
             args['wandb']['id'] = id
-        
-def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
 
-    # initialize the process group
-    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+def search_dict(d, k_replace, v_replace):
+    if isinstance(k_replace, str):
+        k_replace = k_replace.split('.')    
+    curr_dict = d
+    found = True
+    for i in range(len(k_replace)-1):
+        check = k_replace[i]
+        if check in curr_dict:
+            curr_dict = curr_dict[check]
+        else:
+            found = False
 
-def cleanup():
-    dist.destroy_process_group()
 
-def run(f, world_size, args):
-    mp.spawn(f, args=(world_size, args), nprocs=world_size, join=True)
+    if found and k_replace[-1] in curr_dict:
+        curr_dict[k_replace[-1]] = v_replace
+        return
 
-def main(rank, args):
-    
-    if torch.cuda.device_count() > 1 and args['multi_gpu']:
-        setup(rank, torch.cuda.device_count())
-        device = rank
-        map_location = {'cuda:%d' % 0: 'cuda:%d' % rank}
-    else:
-        device = torch.device('cuda')
-        map_location = None
+    for k, v in d.items():
+        if isinstance(v, dict):
+            search_dict(v, k_replace, v_replace)
+
+def parse_unk_args(args, unknown):
+    if len(unknown) % 2:
+        raise ValueError('Didnt find an even number of arg/value pairs, got %d'%len(unknown))
+    args_value_pair = [(unknown[2*i], unknown[2*i+1]) for i in range(len(unknown)//2)]
+    for k_replace, v_replace in args_value_pair:
+        print(k_replace, v_replace)
+        search_dict(args, k_replace.replace('-', '').lower(), v_replace)
+    return args
+
+def main(args):
+    device = torch.device('cuda')
+    map_location = None
+
     tokenizer = Tokenizer(args['data']['base'])
     args = compute_extra_args(args, tokenizer)
 
@@ -111,19 +143,8 @@ def main(rank, args):
 
     args = compute_nb_steps(args, train_loader)
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
-
-    checkpoint_dir = os.path.join(args['io']['save_path'], 'checkpoints')
-    if os.path.exists(checkpoint_dir) and len(os.listdir(checkpoint_dir)) > 1 and not args['resume_training']:
-        raise ValueError("Save path %s already exists, but not resuming training. Add '--resume_training' to arguments to resume training"%args['io']['save_path'])
-    elif args['resume_training']:
-        latest_checkpoint = get_last_checkpoint(args['io']['save_path'], map_location)
-        model.load_state_dict(latest_checkpoint['model_state_dict'])
-        optimizer.load_state_dict(latest_checkpoint['opt_state_dict'])
-        scheduler.load_state_dict(latest_checkpoint['scheduler_state_dict'])
-    else:
-        os.makedirs(args['io']['save_path'])
-        os.makedirs(args['io']['save_path'] + 'checkpoints/')
-        latest_checkpoint = None
+    
+    model, optimizer, scheduler, latest_checkpoint = create_or_load_save_dir(args, model, optimizer, scheduler, map_location)
 
     wandb_init(args)
 
@@ -133,9 +154,6 @@ def main(rank, args):
         pprint.pprint(args['model_args'])
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, oos_loader, device, args, latest_checkpoint)
 
-    if args['multi_gpu']:
-        dist.barrier()
-
     best_checkpoint = get_best_checkpoint(args['io']['save_path'], map_location=map_location)['model_state_dict']
     model.load_state_dict(best_checkpoint)
     compute_factorization_metrics(model, tokenizer, device, args, args['data']['test_path'], 
@@ -143,35 +161,26 @@ def main(rank, args):
     compute_factorization_metrics(model, tokenizer, device, args, args['data']['oos_path'], 
                 save_suffix = 'oos')
 
-    if args['multi_gpu']:
-        cleanup()
 
 if __name__ == "__main__":
     """
-    Test to make sure old version (no relative pe, no repeated pe) make sure results loook same
-    For scaling embeddings, try scaling the initialization instead of them at runtime
     TODO: (no particular order)
-    * Add a paramater to train_factoriation_model that overwrites path in the arguments
-        * This makes it much easier to reproduce experiments:
-        * You can go train_factorization_moddel --config path_to_fully_trained_config --overwrite_path path_for_repeated_experiment
-        * In general implement this as some sort of test to make sure stuff's working
-    * DOUBLE CHECK TO MAKE SURE THAT RELATIVE POSITIONAL ENCODINGS ARE WORKING PROPERLY!!!
-    * Write some documentation on how the arguments work
-        * also cleanup docuemntation that's on github, becasue it's out of date
-    * Model seems to be very sensitive to changes in initializations:
-        * MultiHeadedAttention.out_proj
-        * Initializing with xavier uniform (weights) and 0 (bias) reduces accuracy (on small problem) by 10-12%....
+    Code Cleanup:
+        * Setup model "unit" tests to make sure nothing's broken
+
+        * Write some documentation on how the arguments work
+            * also cleanup docuemntation that's on github, becasue it's out of date
+
+        * Multi Beam Metrics (i.e. n_beams in args, produce metrics file for each beam size)
+
+        * Also fix the issue if you pass a suffix into the for train, i don't think it works
+
     * How do I add a json to the summary for WANDB?
-    * Multi Beam Metrics (i.e. n_beams in args, produce metrics file for each beam size)
-    * Also fix the issue if you pass a suffix into the for train, i don't think it works
+
     * Different types of positional embeddings:
         * Rotary Embeddings
         * Alibi
         * Concatenating positional embeddings, not adding them
-    
-    * Different initializations:
-        * embeddings
-        * WEIGHTS IN ATTENTION SEEM IMPORTANT!!!
 
     * Shared weights between layers in transformer
         * Also consider the thingy that they mention in the paper: (Universal Transformers or somethin)
@@ -185,19 +194,22 @@ if __name__ == "__main__":
     * Set a seed for model training (what's the best way to handle resuming training? If we resume from training on 
             many numbers (i.e. less than 1 epoch), we don't want to start from the beginning)
     * Remove multi gpu spport in train script - will eventually hopefully move to lightning for this
+
+    * What's the best way for positional encoding the tgt-memory attention when attention is relative?
+        * No PE is added currently
     """
     parser = ArgumentParser()
     parser.add_argument('--config', required=True)
     parser.add_argument('--resume_training', action='store_true', default=False)
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
     with open(args.config, 'r') as f:
         config_args = yaml.safe_load(f)
         config_args['resume_training'] = args.resume_training
+        config_args = parse_unk_args(config_args, unknown)
+
+    print(config_args)
+    sys.exit()
     
-    
-    if torch.cuda.device_count() > 1 and config_args['multi_gpu']:
-        run(main, torch.cuda.device_count(), config_args)
-    else:
-        main(None, config_args)
+    main(config_args)
 
 

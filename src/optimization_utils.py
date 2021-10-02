@@ -6,15 +6,6 @@ import pandas as pd
 import yaml
 import os
 import wandb
-from scheduler import get_linear_schedule_with_warmup
-
-def get_scheduler(args, optimizer):
-    # linear_schedule_with_warmup
-    if args['scheduler']['type']=='linear_schedule_with_warmup':
-        scheduler = get_linear_schedule_with_warmup(optimizer, args['scheduler']['n_warmup_steps'], args['scheduler']['nb_steps'])
-    else:
-        raise ValueError('only using linear_schedule_with_warmup right now')
-    return scheduler
 
 def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True):
     numbers = torch.tensor(tokenizer.encode(batch['number'])).to(device)
