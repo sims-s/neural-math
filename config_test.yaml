@@ -19,19 +19,23 @@
   'repeat_positional_encoding' : True
   'positional_encoding_query_key_only' : False
   'relative_positional_encoding' : False
+  'extra_positional_encoding_relative_decoder_mha' : True
+  'attn_weight_xavier_init_constant' : .5
 
 'optimizer':
-  'type' : 'adam'
+  'type' : 'Adam'
   'opt_args' : 
     'lr' : 0.001
+    'weight_decay' : 0
   'max_grad_norm' : 1
   'gradient_accumulation_steps' : 1
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
-  'n_warmup_steps' : 10
-  'nb_epochs' : 1
-  'max_steps' : 500
+  'scheduler_args' : 
+    'n_warmup_steps' : 10
+    'nb_epochs' : 1
+    'max_steps' : 500
 
 'loader' :
   'train' : 

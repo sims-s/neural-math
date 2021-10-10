@@ -62,6 +62,7 @@ class Factorizer(nn.Module):
                         relative_positional_encoding = False,
                         extra_positional_encoding_relative_decoder_mha = False,
                         attn_weight_xavier_init_constant = .5,
+                        post_attention_func = 'linear',
                          **kwargs):
         super(Factorizer, self).__init__()
         self.shared_embeddings = shared_embeddings

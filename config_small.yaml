@@ -19,19 +19,23 @@
   'repeat_positional_encoding' : True
   'positional_encoding_query_key_only' : False
   'relative_positional_encoding' : False
+  'extra_positional_encoding_relative_decoder_mha' : True
+  'attn_weight_xavier_init_constant' : .5
   
 'optimizer':
-  'type' : 'adam'
+  'type' : 'Adam'
   'opt_args' : 
     'lr' : 0.001
+    'weight_decay': 0
   'max_grad_norm' : 1
   'gradient_accumulation_steps' : 1
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
-  'n_warmup_steps' : 5000
-  'nb_epochs' : 50
-  'max_steps' : -1
+  'scheduler_args' : 
+    'n_warmup_steps' : 5000
+    'nb_epochs' : 50
+    'max_steps' : -1
 
 'loader' :
   'train' : 
@@ -45,7 +49,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/benchmarks/2^13/baseline_repeat_pos_enc_no_x2_dec_tgt/'
+  'save_path' : './models/test/'
   'checkpoint_every' : 1000
   'evaluate_every' : 1
   'evaluate_final' : True

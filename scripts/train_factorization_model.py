@@ -43,6 +43,7 @@ def get_model(args, device):
     return model
 
 def get_optimizer(args, model):
+    return getattr(optim, args['optimizer']['type'])(**args['optimizer']['opt_args'])
     if args['optimizer']['type'].lower()=='adam':
         opt = optim.Adam(model.parameters(), **args['optimizer']['opt_args'])
     else:
@@ -165,38 +166,19 @@ def main(args):
 if __name__ == "__main__":
     """
     TODO: (no particular order)
-    Code Cleanup:
-        * Setup model "unit" tests to make sure nothing's broken
 
-        * Write some documentation on how the arguments work
-            * also cleanup docuemntation that's on github, becasue it's out of date
+    * Quick ideas to try:
+        * Weight decay somewhere: RUN EXPERIMENT
+        * AdamW vs Adam: RUN EXPERIMENT
+        * Train the model for a lot longer
+            * Use a different learning rate strategy
 
-        * Multi Beam Metrics (i.e. n_beams in args, produce metrics file for each beam size)
+    * Write some documentation on how the arguments work
+        * also cleanup docuemntation that's on github, becasue it's out of date
 
-        * Also fix the issue if you pass a suffix into the for train, i don't think it works
+    * What if the model sees the factorization in multiple bases at the same time?
+        * Diferent bases seem to perform differently, I wonder what combinding them would do
 
-    * How do I add a json to the summary for WANDB?
-
-    * Different types of positional embeddings:
-        * Rotary Embeddings
-        * Alibi
-        * Concatenating positional embeddings, not adding them
-
-    * Shared weights between layers in transformer
-        * Also consider the thingy that they mention in the paper: (Universal Transformers or somethin)
-        * Some way to have a sense of how many times we need to pass through the model
-        * b/c duh 4 is easier to factor than 1234563452341432123 or whatever
-
-    * See about using WANDB sweeps
-
-    * Is there any benefit to using lightning?
-        * I think for multi gpu support it might be useful, but everyhting else I've/would like to do myself
-    * Set a seed for model training (what's the best way to handle resuming training? If we resume from training on 
-            many numbers (i.e. less than 1 epoch), we don't want to start from the beginning)
-    * Remove multi gpu spport in train script - will eventually hopefully move to lightning for this
-
-    * What's the best way for positional encoding the tgt-memory attention when attention is relative?
-        * No PE is added currently
     """
     parser = ArgumentParser()
     parser.add_argument('--config', required=True)
@@ -207,8 +189,6 @@ if __name__ == "__main__":
         config_args['resume_training'] = args.resume_training
         config_args = parse_unk_args(config_args, unknown)
 
-    print(config_args)
-    sys.exit()
     
     main(config_args)
 

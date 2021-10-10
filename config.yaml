@@ -11,29 +11,31 @@
   'dim_feedforward' : 512
   'dropout' : .05
   'shared_embeddings' : True
-  'scale_embeddings' : False
+  'scale_embeddings' : True
   'scale_embeddings_at_init' : False
   'max_decode_size' : 64
   'norm_first' : False
   'learn_positional_encoding' : False
   'repeat_positional_encoding' : False
-  'positional_encoding_query_key_only' : True
+  'positional_encoding_query_key_only' : False
   'relative_positional_encoding' : True
   'extra_positional_encoding_relative_decoder_mha' : True
   'attn_weight_xavier_init_constant' : .5
 
-'optimizer':
-  'type' : 'adam'
+'optimizer': 
+  'type' : 'AdamW'
   'opt_args' : 
     'lr' : 0.001
+    'weight_decay' : 0
   'max_grad_norm' : 1
   'gradient_accumulation_steps' : 1
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
-  'n_warmup_steps' : 24000
-  'nb_epochs' : 200
-  'max_steps' : -1
+  'scheduler_args' : 
+    'n_warmup_steps' : 24000
+    'nb_epochs' : 200
+    'max_steps' : -1
 
 'loader' :
   'train' : 
@@ -49,7 +51,7 @@
     'batch_size' : 256
     'shuffle' : False
 'io':
-  'save_path' : './models/baseline_relative_pe_base_30_extra_2/'
+  'save_path' : './models/baseline_scale_embeddings/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -63,7 +65,7 @@
 'verbose' : True
 
 'wandb' : 
-  'enabled' : False
+  'enabled' : True
   'project' : 'integer-factorization'
   'entity' : 'sims-s'
   'watch_args' : 
