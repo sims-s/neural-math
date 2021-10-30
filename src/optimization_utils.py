@@ -6,6 +6,7 @@ import pandas as pd
 import yaml
 import os
 import wandb
+import scheduler as scheduler_mod
 
 def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True):
     numbers = torch.tensor(tokenizer.encode(batch['number'])).to(device)
@@ -45,7 +46,10 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
             if max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             opt.step()
-            scheduler.step()
+            if isinstance(scheduler, scheduler_mod.ReduceLROnPlateauWithWarmup):
+                scheduler.step(batch_loss)
+            else:
+                scheduler.step()
             pbar.update(1)
             global_step += 1
             loss_hist.append(batch_loss)
@@ -60,10 +64,10 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
             model.train()
             loss_hist = []
         
-        if global_step >= args['scheduler']['nb_steps']:
+        if global_step >= args['scheduler']['scheduler_args']['nb_steps']:
             break
 
-    if global_step==args['scheduler']['nb_steps']:
+    if global_step==args['scheduler']['scheduler_args']['nb_steps']:
             global_loss_hist = checkpoint(model, opt, test_loader, oos_loader, tokenizer, loss_func, device, 
                                             np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, 
                                             scheduler, args['io']['evaluate_final'])
@@ -82,6 +86,8 @@ def checkpoint(model, optimizer, test_loader, oos_loader, tokenizer, loss_func, 
             oos_loss = np.nan
         if args['verbose']:
             tqdm.write('Train: %.6f, Test: %.6f, OoS: %.6f'%(train_loss, test_loss, oos_loss))
+        # for i, param_group in enumerate(optimizer.param_groups):
+        #     print(param_group['lr'])
 
         
         loss_hist.append([global_step, train_loss, test_loss, oos_loss])
@@ -116,7 +122,7 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
             print('Resuming Training!')
     
     loss_func = nn.CrossEntropyLoss()
-    pbar = tqdm(total = args['scheduler']['nb_steps'], leave=False)
+    pbar = tqdm(total = args['scheduler']['scheduler_args']['nb_steps'], leave=False)
     if args['wandb']['enabled']:
         wandb.watch(model, criterion=loss_func, **args['wandb']['watch_args'])
 

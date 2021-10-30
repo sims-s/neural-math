@@ -32,10 +32,10 @@
 
 'scheduler' : 
   'type' : linear_schedule_with_warmup
+  'nb_epochs' : 50
+  'max_steps' : -1
   'scheduler_args' : 
     'n_warmup_steps' : 5000
-    'nb_epochs' : 50
-    'max_steps' : -1
 
 'loader' :
   'train' : 

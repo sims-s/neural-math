@@ -45,7 +45,7 @@ def main(cli_args):
     device = torch.device('cuda')
     tokenizer = Tokenizer(args['data']['base'])
     model = load_model(args, device, checkpoint['model_state_dict'])
-    compute_factorization_metrics(model, tokenizer, device, args, data_path=cli_args.data_path, save_suffix=cli_args.save_suffix)
+    compute_factorization_metrics(model, tokenizer, device, args, data_path=cli_args.data_path, save_suffix=cli_args.suffix)
 
 
 

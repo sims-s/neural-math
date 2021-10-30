@@ -30,19 +30,31 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerEmbedding(nn.Module):
-    def __init__(self, n_tokens, embed_dim, scale_embeddings, scale_embeddings_at_init):
+    def __init__(self, n_tokens, embed_dim, initialization, scale_embeddings, scale_embeddings_at_init):
         super(TransformerEmbedding, self).__init__()
         self.embed_dim = embed_dim
         self.embedding = nn.Embedding(n_tokens, embed_dim)
         if scale_embeddings_at_init:
             self.embedding.weight.data = self.embedding.weight * math.sqrt(self.embed_dim)
         self.scale_embeddings_realtime = scale_embeddings and not scale_embeddings_at_init
+        self.initialization = initialization
+        self._reset_parameters(initialization)
 
     def forward(self, x):
         embedded = self.embedding(x)
         if self.scale_embeddings_realtime:
             embedded = embedded * math.sqrt(self.embed_dim)
         return embedded.transpose(0,1)
+
+    def _reset_parameters(self, init_type):
+        init_type = init_type.lower()
+        if init_type in ["normal"]:
+            nn.init.normal_(self.embedding.weight)
+        elif init_type in ['xavier', 'xavier_uniform', 'glorot']:
+            nn.init.xavier_uniform_(self.embedding.weight)
+        elif init_type in ['kaiming', 'kaiming_normal']:
+            nn.init.kaiming_normal_(self.embedding.weight)
+        
 
 
 class Factorizer(nn.Module):
@@ -62,7 +74,7 @@ class Factorizer(nn.Module):
                         relative_positional_encoding = False,
                         extra_positional_encoding_relative_decoder_mha = False,
                         attn_weight_xavier_init_constant = .5,
-                        post_attention_func = 'linear',
+                        embedding_initialization = 'normal',
                          **kwargs):
         super(Factorizer, self).__init__()
         self.shared_embeddings = shared_embeddings
@@ -75,8 +87,8 @@ class Factorizer(nn.Module):
 
         self.num_heads = num_heads
 
-        self.src_embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings, scale_embeddings_at_init)
-        self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, scale_embeddings, scale_embeddings_at_init) \
+        self.src_embedding = TransformerEmbedding(n_tokens, embed_dim, embedding_initialization, scale_embeddings, scale_embeddings_at_init)
+        self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, embedding_initialization, scale_embeddings, scale_embeddings_at_init) \
                              if not shared_embeddings else self.src_embedding
 
 

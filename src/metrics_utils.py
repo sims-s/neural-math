@@ -14,15 +14,12 @@ def compute_factorization_metrics(model, tokenizer, device, args, data_path = No
     if args['verbose']:
         print('Computing metrics...')
     
-    #TODO should pass argument for path of data instead of just taking test...
-    if data_path:
-        print('read from data path %s'%data_path)
-        numbers = np.load(data_path, mmap_mode='r')
-    else:
-        print('read from test path %s'%args['data']['test_path'])
-        numbers = np.load(args['data']['test_path'], mmap_mode='r')
-    
+    if not data_path:
+        data_path = args['data']['test_path']
+    numbers = np.load(data_path, mmap_mode='r')
+
     if args['verbose']:
+        print('read from data path %s'%data_path)
         print('Factoring...')
     factor_df = form_factor_df(model, tokenizer, device, args['data']['base'], numbers, args['model_args']['max_decode_size'],
                                args['metrics']['n_beams'], args['metrics']['temperature'], args['metrics']['max_num'])
@@ -34,8 +31,9 @@ def compute_factorization_metrics(model, tokenizer, device, args, data_path = No
     # factor_df.to_pickle(args['io']['save_path'] + 'factor_df%s.pkl'%save_suffix)
     metrics = compute_metrics(factor_df)
     # Add test loss to metrics
-    loader = prepare_dataloader(args['data']['test_path'], args, **args['loader']['test'])
-    metrics['test_loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device)
+    loader_args = args['loader']['oos'] if data_path == args['data']['oos_path'] else args['loader']['test']
+    loader = prepare_dataloader(data_path, args, **loader_args)
+    metrics['loss'] = test_on_loader(model, loader, tokenizer, nn.CrossEntropyLoss(), device)
     metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
     save_json(metrics, args['io']['save_path'] + 'metrics%s.json'%save_suffix)
     # if args['wandb']['enabled']:

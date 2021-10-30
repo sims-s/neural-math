@@ -9,7 +9,7 @@ import pprint
 import sys
 import wandb
 sys.path.append('./src/')
-from scheduler import get_linear_schedule_with_warmup
+import scheduler as scheduler_module
 from tokenizer import Tokenizer
 from data_utils import prepare_dataloader
 from models import Factorizer
@@ -43,7 +43,7 @@ def get_model(args, device):
     return model
 
 def get_optimizer(args, model):
-    return getattr(optim, args['optimizer']['type'])(**args['optimizer']['opt_args'])
+    return getattr(optim, args['optimizer']['type'])(model.parameters(), **args['optimizer']['opt_args'])
     if args['optimizer']['type'].lower()=='adam':
         opt = optim.Adam(model.parameters(), **args['optimizer']['opt_args'])
     else:
@@ -52,8 +52,9 @@ def get_optimizer(args, model):
 
 def get_scheduler(args, optimizer):
     # linear_schedule_with_warmup
+    return getattr(scheduler_module, args['scheduler']['type'])(optimizer, **args['scheduler']['scheduler_args'])
     if args['scheduler']['type']=='linear_schedule_with_warmup':
-        scheduler = get_linear_schedule_with_warmup(optimizer, args['scheduler']['n_warmup_steps'], args['scheduler']['nb_steps'])
+        scheduler = get_linear_schedule_with_warmup(optimizer, **args['scheduler']['scheduler_args'])
     else:
         raise ValueError('only using linear_schedule_with_warmup right now')
     return scheduler
@@ -69,9 +70,9 @@ def get_model_opt_scheduler(args, device):
     return model, optimizer, scheduler, args
 
 def compute_nb_steps(args, train_loader):
-    args['scheduler']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader) // args['optimizer']['gradient_accumulation_steps']
+    args['scheduler']['scheduler_args']['nb_steps'] = args['scheduler']['nb_epochs'] * len(train_loader) // args['optimizer']['gradient_accumulation_steps']
     if args['scheduler']['max_steps'] > 0:
-        args['scheduler']['nb_steps'] = min(args['scheduler']['nb_steps'], args['scheduler']['max_steps'])
+        args['scheduler']['scheduler_args']['nb_steps'] = min(args['scheduler']['scheduler_args']['nb_steps'], args['scheduler']['max_steps'])
     return args
 
 
@@ -150,7 +151,7 @@ def main(args):
     wandb_init(args)
 
     if args['verbose']:
-        print('Running training for %d steps, %d warmup'%(args['scheduler']['nb_steps'], args['scheduler']['n_warmup_steps']))
+        print('Running training for %d steps'%(args['scheduler']['scheduler_args']['nb_steps']))
         print('Model args: ')
         pprint.pprint(args['model_args'])
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, oos_loader, device, args, latest_checkpoint)
@@ -168,10 +169,25 @@ if __name__ == "__main__":
     TODO: (no particular order)
 
     * Quick ideas to try:
-        * Weight decay somewhere: RUN EXPERIMENT
-        * AdamW vs Adam: RUN EXPERIMENT
+        * 
         * Train the model for a lot longer
             * Use a different learning rate strategy
+        * Rerun using scaled embeddings... why didn't it diverge???
+            * Also try scaled embeddings at init
+
+        * Hypaeraomapars to ablage:
+            * Different embedding initialization/scaling
+            * # encoder/decoder layers
+            * embedding dim
+            * 3200 epoch run with larger weight decay
+    * Difficulty Sampling:
+        * Figure out which numbers are generically harder: sample those more frequently
+        * Like do we reeeaaalllly need 50% even numbers???
+
+
+    * UPDATES TO CONFIGS TO MAKE:
+        * OPTIMIZER: -> "Adam" instead of "adam"
+        * positional_encoding_query_key_only = False if positional encoding is true...
 
     * Write some documentation on how the arguments work
         * also cleanup docuemntation that's on github, becasue it's out of date

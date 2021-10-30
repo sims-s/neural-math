@@ -197,7 +197,7 @@
             "correct_factorization_mean": 0.0
         }
     },
-    "test_loss": 0.0733976509475794,
+    "loss": 0.1442732708528638,
     "meta": {
         "n_beams": 2,
         "temperature": 1.0
