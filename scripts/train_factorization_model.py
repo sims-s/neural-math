@@ -169,7 +169,6 @@ if __name__ == "__main__":
     TODO: (no particular order)
 
     * Quick ideas to try:
-        * 
         * Train the model for a lot longer
             * Use a different learning rate strategy
         * Rerun using scaled embeddings... why didn't it diverge???
@@ -177,12 +176,13 @@ if __name__ == "__main__":
 
         * Hypaeraomapars to ablage:
             * Different embedding initialization/scaling
-            * # encoder/decoder layers
             * embedding dim
             * 3200 epoch run with larger weight decay
     * Difficulty Sampling:
         * Figure out which numbers are generically harder: sample those more frequently
         * Like do we reeeaaalllly need 50% even numbers???
+
+    * Make max_decode_size_auto extended... or a paramater or something....
 
 
     * UPDATES TO CONFIGS TO MAKE:

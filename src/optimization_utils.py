@@ -7,17 +7,25 @@ import yaml
 import os
 import wandb
 import scheduler as scheduler_mod
+import sys
+sys.path.append('src/')
+import data_utils
 
-def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True):
+def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True, dataset=None):
     numbers = torch.tensor(tokenizer.encode(batch['number'])).to(device)
     labels = torch.tensor(tokenizer.encode(batch['label'])).to(device)
     res = model(numbers, labels[:,:-1])
     loss = loss_func(res.view(-1, len(tokenizer)), labels[:,1:].reshape(-1))
     if train:
+        loss = loss.mean()
         loss = loss / grad_accum_steps
         loss.backward()
-    return loss.item()
+    else:
+        if dataset and isinstance(dataset, data_utils.FactorizationDatasetPropLoss):
+            dataset.update_weights(loss)
+        loss = loss.mean()
     
+    return loss.item()
 def test_on_loader(model, loader, tokenizer, loss_func, device):
     model.eval()
     pbar = tqdm(total = len(loader), leave=False)
@@ -121,7 +129,7 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
         else:
             print('Resuming Training!')
     
-    loss_func = nn.CrossEntropyLoss()
+    loss_func = nn.CrossEntropyLoss(reduction='none')
     pbar = tqdm(total = args['scheduler']['scheduler_args']['nb_steps'], leave=False)
     if args['wandb']['enabled']:
         wandb.watch(model, criterion=loss_func, **args['wandb']['watch_args'])

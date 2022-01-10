@@ -5,9 +5,9 @@
   'base' : 30
 
 'model_args':
-  'embed_dim' : 128
-  'num_encoder_layers' : 8
-  'num_decoder_layers' : 8
+  'embed_dim' : 512
+  'num_encoder_layers' : 6
+  'num_decoder_layers' : 6
   'dim_feedforward' : 512
   'dropout' : .05
   'shared_embeddings' : True
@@ -60,7 +60,7 @@
     'batch_size' : 256
     'shuffle' : False
 'io':
-  'save_path' : './models/baseline_8_enc_dec_layers/'
+  'save_path' : './models/baseline_embed_dim_512/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True
