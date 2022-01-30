@@ -8,6 +8,7 @@ import torch.optim as optim
 import pprint
 import sys
 import wandb
+import re
 sys.path.append('./src/')
 import scheduler as scheduler_module
 from tokenizer import Tokenizer
@@ -21,7 +22,7 @@ def get_datasets(args):
     if args['verbose']:
         print('Loading data...')
 
-    return prepare_dataloader(args['data']['train_path'], args, **args['loader']['train']), \
+    return prepare_dataloader(args['data']['train_path'], args, **args['loader']['train'], is_train=True), \
            prepare_dataloader(args['data']['test_path'], args, **args['loader']['test']), \
            prepare_dataloader(args['data']['oos_path'], args, **args['loader']['oos'])
     
@@ -32,6 +33,11 @@ def compute_extra_args(args, tokenizer):
     args['tokenizer'] = {}
     args['tokenizer']['n_tokens'] = len(tokenizer)
     args['tokenizer']['pad_token_id'] = tokenizer.encode('_')[0]
+
+    if re.match("pairwise_\d+", args['data']['train_path']):
+        args['data']['holdout_file'] = [args['data']['test_path'], args['data']['oos_path']]
+
+
     return args
 
 

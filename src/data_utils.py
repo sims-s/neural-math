@@ -10,6 +10,7 @@ import utils
 from torch._six import int_classes as _int_classes
 from typing import List
 import re
+import copy
 
 class RandomMemorylessSampler(Sampler[int]):
     r"""Samples elements randomly. If without replacement, then sample from a shuffled dataset.
@@ -158,6 +159,39 @@ class FactorizationDataset(Dataset):
     def __len__(self):
         return self.numbers.shape[0]
 
+class FactorizationDatasetPairOFPrime(Dataset):
+    def __init__(self, max_val, base, primes_file='data/primes_2B.npy', holdout_file = None):
+        self.max_val = max_val
+        self.max_prime_idx = int(primepi(max_val//2))
+        self.length = int(max_val * .2)
+        self.primes = np.load(primes_file, mmap_mode='r')
+        self.max_val = self.primes[self.max_prime_idx] * 2
+        self.base = base
+        if isinstance(holdout_file, str):
+            holdout_nums = np.load(holdout_file).tolist()
+        else:
+            holdout_nums = []
+            for f in holdout_file:
+                holdout_nums.extend(np.load(f).tolist())
+        self.holdout_set = set(holdout_nums)
+        
+    def __getitem__(self, i):
+        first_prime = self.primes[np.random.choice(self.max_prime_idx)]
+        remainder = self.max_val // first_prime
+        other_max_prime_idx = primepi(remainder)
+        second_prime = self.primes[np.random.choice(other_max_prime_idx)]
+        product = first_prime * second_prime
+        first_prime, second_prime = min(first_prime, second_prime), max(first_prime, second_prime)
+        if product in self.holdout_set:
+            return self.__getitem__(0)
+
+        return {
+            'number' : form_input(product, self.base),
+            'label' : form_label_from_factorlist([first_prime, second_prime], self.base)
+        }
+        
+    def __len__(self):
+        return self.length
 
 
 class FactorizationDatasetPropLoss(Dataset):
@@ -315,8 +349,9 @@ class FactorizationDatasetPropLoss(Dataset):
         
     def __len__(self):
         return self.len_replacement
-
-def get_dataset(number_file, args, batch_size):
+# class FactorizationDatasetPairOFPrime(Dataset):
+#     def __init__(self, max_val, base, primes_file='data/primes_2B.npy', holdout_file = None):
+def get_dataset(number_file, args, batch_size, is_train=False):
     if number_file.endswith('.npy'):
         return FactorizationDataset(number_file, args['data']['base'])
     elif re.match("lossprop_\d+", number_file):
@@ -327,14 +362,20 @@ def get_dataset(number_file, args, batch_size):
                                             test_vals = np.load(args['data']['test_path']),
                                             batch_size = batch_size,
                                             **dataset_kwargs)
+    elif re.match("pairwise_\d+", number_file):
+        max_val = int(number_file.split('_')[1])
+        dataset_kwargs = {'base' : args['data']['base']}
+        if is_train:
+            dataset_kwargs['holdout_file'] = args['data']['holdout_file']
+        return FactorizationDatasetPairOFPrime(max_val, **dataset_kwargs)
     else:
         raise ValueError(f"number_file {number_file} not understood")
 
 
 
-def prepare_dataloader(number_file, args, **loader_kwargs):
+def prepare_dataloader(number_file, args, is_train=False, **loader_kwargs):
     batch_size = loader_kwargs.get('batch_size', 1)
-    data = get_dataset(number_file, args, batch_size)
+    data = get_dataset(number_file, args, batch_size, is_train=is_train)
     sampler = None
     if loader_kwargs.pop('random_sampling', False):
         sampler = RandomMemorylessSampler(data)
