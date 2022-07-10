@@ -18,7 +18,7 @@
   'learn_positional_encoding' : False
   'repeat_positional_encoding' : False
   'positional_encoding_query_key_only' : False
-  'relative_positional_encoding' : True
+  'positional_encoding_type' : 'relative-transfxl'
   'extra_positional_encoding_relative_decoder_mha' : True
   'attn_weight_xavier_init_constant' : .5
   'embedding_initialization' : 'normal'

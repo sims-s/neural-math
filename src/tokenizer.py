@@ -3,16 +3,28 @@ from utils import drop_from_iterable
 
 
 class Tokenizer():
-    def __init__(self, base):
+    def __init__(self, base, model_type):
         token_mapper = {str(i):i for i in range(base)}
         # Make sure start of sequence token is always the last token in the tokenizer
         # (Needed in generation_utils.decode)
-        token_mapper.update({
-            'x' : base, # multiplication
-            '_' : base+1, #padding,
-            '.' : base+2, # end of sequence
-            '>' : base+3, # start of sequence
-        })
+        if model_type=='addition':
+            token_mapper.update({
+                '+' : base, # addition
+                '_' : base+1, #padding,
+                '.' : base+2, # end of sequence
+                '>' : base+3, # start of sequence
+            })
+
+        elif model_type=='factorization':
+            token_mapper.update({
+                'x' : base, # multiplication
+                '_' : base+1, #padding,
+                '.' : base+2, # end of sequence
+                '>' : base+3, # start of sequence
+            })
+        else:
+            raise ValueError
+        
         self.token_mapper = token_mapper
         self.inverse = {v: k for k,v in self.token_mapper.items()}
         
@@ -56,4 +68,3 @@ class Tokenizer():
     
     def __len__(self):
         return len(self.token_mapper)
-            

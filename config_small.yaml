@@ -4,6 +4,7 @@
   'oos_path' : 'data/oos_data_2^13.npy'
   'base' : 2
 
+'model_type' : 'factorization'
 'model_args':
   'embed_dim' : 128
   'num_encoder_layers' : 6
@@ -18,7 +19,7 @@
   'learn_positional_encoding' : False
   'repeat_positional_encoding' : True
   'positional_encoding_query_key_only' : False
-  'relative_positional_encoding' : False
+  'positional_encoding_type' : 'absolute'
   'extra_positional_encoding_relative_decoder_mha' : True
   'attn_weight_xavier_init_constant' : .5
   

@@ -9,7 +9,9 @@ from sympy import factorint
 from sympy.ntheory.primetest import isprime
 
 
-
+"""================="""
+"""FOR FACTORIZATION"""
+"""================="""
 def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams, temperature):
     sequences = torch.tensor(tokenizer.encode('>')).to(device).unsqueeze(0)
     sequence_log_probs = torch.tensor([[0]]).to(device)
@@ -133,6 +135,73 @@ def factor(number, base, model, tokenizer, device, max_decode_size, n_beams=1, t
     for i in range(len(factors_list)):
         to_return.append(postprocess(factors_list[i], log_probs[i], base_10_num, base, i, tokenizer, postprocess_minimal))
         
+    if return_type=='df':
+        return pd.DataFrame.from_dict(to_return)
+    elif return_type=='dict':
+        return to_return
+    else:
+        raise ValueError('got unexpected return type %s'%return_type)
+
+
+
+"""============"""
+"""FOR ADDITION"""
+"""============"""
+def decode_beam_addition(beam, tokenizer, base):
+    sos = tokenizer.encode('>')[0]
+    eos = tokenizer.encode('.')[0]
+    pad = tokenizer.encode('_')[0]
+    # Ignore all padding tokens
+    beam = [tok for tok in beam if not tok==pad]
+    start = None if not sos in beam else beam.index(sos)
+    end = None if not eos in beam else beam.index(eos)
+    if start is not None and end is not None:
+        beam = beam[start+1:end]
+        try:
+            return data_utils.base2dec(beam, base)
+        except (ValueError, TypeError):
+            return None
+    else:
+        return None
+
+from functools import lru_cache
+@lru_cache
+def model_add(n1, n2, base, model, tokenizer, device, max_decode_size, n_beams, temperature, return_type='dict'):
+    base_10_n1 = n1
+    base_10_n2 = n2
+    input_list = data_utils.form_input_addition(n1, n2, base)
+    label_list = data_utils.form_label_addition(n1, n2, base)
+
+    input = torch.tensor(tokenizer.encode(input_list), device=device).unsqueeze(0)
+
+    with torch.no_grad():
+        memory, memory_key_padding_mask = model.encode(input)
+
+    outputs, logprobs = decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams, temperature)
+
+    to_return = []
+    for i in range(len(outputs)):
+        number_predicted = decode_beam_addition(outputs[i], tokenizer, base)
+        add_dict = {
+            'n1' : base_10_n1, 
+            'n2' : base_10_n2, 
+            'n1 + n2' : base_10_n1 + base_10_n2, 
+            'input_list': input_list,
+            'label_list' : label_list,
+            'input_str' : ''.join([str(c) for c in input_list]),
+            'label_str' : ''.join([str(c) for c in label_list]),
+            'pred_tokens' : outputs[i].tolist(),
+            'pred_num' : number_predicted,
+            'log_prob' : logprobs[i].item(),
+            'beam_idx' : i
+        }
+        if add_dict['pred_num'] is None:
+            add_dict['pred_is_right'] = False
+        else:
+            add_dict['pred_is_right'] = int(n1 + n2) == int(add_dict['pred_num'])
+        to_return.append(add_dict)
+        
+
     if return_type=='df':
         return pd.DataFrame.from_dict(to_return)
     elif return_type=='dict':

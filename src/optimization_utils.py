@@ -26,6 +26,8 @@ def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, trai
         loss = loss.mean()
     
     return loss.item()
+
+    
 def test_on_loader(model, loader, tokenizer, loss_func, device):
     model.eval()
     pbar = tqdm(total = len(loader), leave=False)
@@ -50,7 +52,7 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
         loss = run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True)
         batch_loss += loss
         
-        if not global_batches % grad_accum_steps:
+        if global_batches and not global_batches % grad_accum_steps:
             if max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             opt.step()
@@ -93,7 +95,7 @@ def checkpoint(model, optimizer, test_loader, oos_loader, tokenizer, loss_func, 
             test_loss = np.nan
             oos_loss = np.nan
         if args['verbose']:
-            tqdm.write('Train: %.6f, Test: %.6f, OoS: %.6f'%(train_loss, test_loss, oos_loss))
+            tqdm.write('Train: %.9f, Test: %.9f, OoS: %.9f'%(train_loss, test_loss, oos_loss))
         # for i, param_group in enumerate(optimizer.param_groups):
         #     print(param_group['lr'])
 

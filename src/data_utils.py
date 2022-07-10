@@ -159,6 +159,30 @@ class FactorizationDataset(Dataset):
     def __len__(self):
         return self.numbers.shape[0]
 
+
+def form_input_addition(n1, n2, base):
+    return ['>'] + dec2base(n1, base) + ['+'] + dec2base(n2, base) + ['.']
+
+def form_label_addition(n1, n2, base):
+    return ['>'] + dec2base(n1 + n2, base) + ['.']
+
+
+class AdditionDataset(Dataset):
+    def __init__(self, number_file, base):
+        self.numbers = np.load(number_file, mmap_mode='r')
+        self.base = base
+
+    def __getitem__(self, i):
+        n1, n2 = self.numbers[i]
+        output =  {
+            'number' : form_input_addition(n1, n2, self.base),
+            'label' : form_label_addition(n1, n2, self.base)
+        }
+        return output
+
+    def __len__(self):
+        return self.numbers.shape[0]
+
 class FactorizationDatasetPairOFPrime(Dataset):
     def __init__(self, max_val, base, primes_file='data/primes_2B.npy', holdout_file = None):
         self.max_val = max_val
@@ -349,27 +373,29 @@ class FactorizationDatasetPropLoss(Dataset):
         
     def __len__(self):
         return self.len_replacement
-# class FactorizationDatasetPairOFPrime(Dataset):
-#     def __init__(self, max_val, base, primes_file='data/primes_2B.npy', holdout_file = None):
+
 def get_dataset(number_file, args, batch_size, is_train=False):
-    if number_file.endswith('.npy'):
-        return FactorizationDataset(number_file, args['data']['base'])
-    elif re.match("lossprop_\d+", number_file):
-        max_val = int(number_file.split('_')[1])
-        dataset_kwargs = args['data'].get('dataset_args', {})
-        return FactorizationDatasetPropLoss(max_val, 
-                                            args['data']['base'], 
-                                            test_vals = np.load(args['data']['test_path']),
-                                            batch_size = batch_size,
-                                            **dataset_kwargs)
-    elif re.match("pairwise_\d+", number_file):
-        max_val = int(number_file.split('_')[1])
-        dataset_kwargs = {'base' : args['data']['base']}
-        if is_train:
-            dataset_kwargs['holdout_file'] = args['data']['holdout_file']
-        return FactorizationDatasetPairOFPrime(max_val, **dataset_kwargs)
-    else:
-        raise ValueError(f"number_file {number_file} not understood")
+    if args['model_type']=='addition':
+        return AdditionDataset(number_file, args['data']['base'])
+    elif args['model_type']=='factorization':
+        if number_file.endswith('.npy'):
+            return FactorizationDataset(number_file, args['data']['base'])
+        elif re.match("lossprop_\d+", number_file):
+            max_val = int(number_file.split('_')[1])
+            dataset_kwargs = args['data'].get('dataset_args', {})
+            return FactorizationDatasetPropLoss(max_val, 
+                                                args['data']['base'], 
+                                                test_vals = np.load(args['data']['test_path']),
+                                                batch_size = batch_size,
+                                                **dataset_kwargs)
+        elif re.match("pairwise_\d+", number_file):
+            max_val = int(number_file.split('_')[1])
+            dataset_kwargs = {'base' : args['data']['base']}
+            if is_train:
+                dataset_kwargs['holdout_file'] = args['data']['holdout_file']
+            return FactorizationDatasetPairOFPrime(max_val, **dataset_kwargs)
+        else:
+            raise ValueError(f"number_file {number_file} not understood")
 
 
 

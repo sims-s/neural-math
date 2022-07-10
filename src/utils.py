@@ -42,8 +42,16 @@ def get_best_checkpoint(path, map_location=None):
         if not 'checkpoints' in path:
             path = os.path.join(path, 'checkpoints/')
         files = [f for f in os.listdir(path) if f.endswith('.pt')]
-        losses = [float(fname.split('_')[1][:-3]) for fname in files]
+        losses = np.array([float(fname.split('_')[1][:-3]) for fname in files])
         best_loss_idx = np.argmin(losses)
+        # if multiple checkpoints have the same losses (usually 0), pick the latest one
+        best_loss_indexer = losses==losses[best_loss_idx]
+        if (best_loss_indexer).sum() > 1: 
+            n_steps = np.array([float(fname.split('_')[0]) for fname in files])
+            indicies_of_best_losses = np.arange(len(losses))[best_loss_indexer]
+            best_loss_steps = n_steps[best_loss_indexer]
+            best_loss_idx = indicies_of_best_losses[np.argmax(best_loss_steps)]
+
         chosen_path = path + files[best_loss_idx]
     print('Loading model at %s'%chosen_path)
     return torch.load(chosen_path, map_location=map_location)

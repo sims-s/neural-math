@@ -57,6 +57,10 @@ class MultiHeadAttention(BaseAttention):
         self._reset_parameters()
 
     def forward(self, query, key, value, attn_mask=None, key_padding_mask=None, need_weights=False):
+        # print(query.size())
+        # print(key.size())
+        # print(value.size())
+        # sys.exit()
         query_len, batch_size, embed_dim = query.size()
         key_len, _, _ = key.size()
 
@@ -69,21 +73,22 @@ class MultiHeadAttention(BaseAttention):
         v = v.view(value.size(0), batch_size * self.num_heads, self.head_dim).transpose(0, 1)
 
 
-        if key_padding_mask is not None:
-            key_padding_mask = key_padding_mask.view(batch_size, 1, 1, key_len).expand(-1, self.num_heads, -1, -1)
-            key_padding_mask = key_padding_mask.reshape(batch_size * self.num_heads, 1, key_len)
-            if attn_mask is None:
-                attn_mask = key_padding_mask
-            else: 
-                attn_mask = attn_mask.logical_or(key_padding_mask)
-        if attn_mask is not None:
-            new_attn_mask = torch.zeros_like(attn_mask, dtype=torch.float)
-            new_attn_mask.masked_fill_(attn_mask, float("-inf"))
+        # if key_padding_mask is not None:
+        #     key_padding_mask = key_padding_mask.view(batch_size, 1, 1, key_len).expand(-1, self.num_heads, -1, -1)
+        #     key_padding_mask = key_padding_mask.reshape(batch_size * self.num_heads, 1, key_len)
+        #     if attn_mask is None:
+        #         attn_mask = key_padding_mask
+        #     else: 
+        #         attn_mask = attn_mask.logical_or(key_padding_mask)
+        # if attn_mask is not None:
+        #     new_attn_mask = torch.zeros_like(attn_mask, dtype=torch.float)
+        #     new_attn_mask.masked_fill_(attn_mask, float("-inf"))
 
         q = q * self.scaling
         attn = torch.bmm(q, k.transpose(-2, -1))
-        if attn_mask is not None:
-            attn += new_attn_mask
+        full_mask = self.make_mask(batch_size, key_len, attn_mask, key_padding_mask)
+        if full_mask is not None:
+            attn += full_mask
         attn_weight = torch.softmax(attn, dim=-1)
         if self.training:
             attn_weight = F.dropout(attn_weight, self.dropout_p)

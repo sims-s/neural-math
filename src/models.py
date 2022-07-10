@@ -28,6 +28,30 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[pos_offset : x.size(0) + pos_offset, :]
         return self.dropout(x)
 
+# class PositionalEncodingDeberta(nn.Module):
+#     def __init__(self, d_model, dropout, max_len, layernorm, position_buckets):
+#         super(PositionalEncodingDeberta, self).__init__()
+#         self.max_relative_positions = max_len
+
+#         self.position_buckets = position_buckets
+#         pos_ebd_size = self.max_relative_positions*2
+
+#         if self.position_buckets>0:
+#             pos_ebd_size = self.position_buckets*2
+#         self.rel_embeddings = nn.Embedding(pos_ebd_size, d_model)
+#         if layernorm:
+#             self.layernorm = nn.LayerNorm(d_model, elementwise_affine=True)
+#         else:
+#             self.layernorm = None
+
+#         self.dropout = nn.Dropout(p=dropout)
+
+#     def get_rel_embeddings(self):
+#         rel_embeddings = self.rel_embeddings.weight
+#         if self.layernorm:
+#             rel_embeddings = self.layernorm(rel_embeddings)
+#         rel_embeddings = self.dropout(rel_embeddings)
+#         return rel_embeddings
 
 class TransformerEmbedding(nn.Module):
     def __init__(self, n_tokens, embed_dim, initialization, scale_embeddings, scale_embeddings_at_init):
@@ -71,7 +95,7 @@ class Factorizer(nn.Module):
                         repeat_positional_encoding=False, 
                         positional_encoding_query_key_only=False, 
                         norm_first = False, 
-                        relative_positional_encoding = False,
+                        positional_encoding_type = 'absolute',
                         extra_positional_encoding_relative_decoder_mha = False,
                         attn_weight_xavier_init_constant = .5,
                         embedding_initialization = 'normal',
@@ -82,7 +106,11 @@ class Factorizer(nn.Module):
         self.repeat_positional_encoding = repeat_positional_encoding
         self.positional_encoding_query_key_only = positional_encoding_query_key_only
         self.norm_first = norm_first
-        self.relative_positional_encoding = relative_positional_encoding
+        valid_pe_types = ['absolute', 'relative-transfxl']
+        if not positional_encoding_type in valid_pe_types:
+            raise ValueError(f'unexpected positional encoding, {positional_encoding_type}, must be one of: ', valid_pe_types)
+        
+        self.positional_encoding_type = positional_encoding_type
         self.extra_positional_encoding_relative_decoder_mha = extra_positional_encoding_relative_decoder_mha
 
         self.num_heads = num_heads
@@ -91,27 +119,27 @@ class Factorizer(nn.Module):
         self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, embedding_initialization, scale_embeddings, scale_embeddings_at_init) \
                              if not shared_embeddings else self.src_embedding
 
-
-        if self.relative_positional_encoding:
+        if self.positional_encoding_type=='relative-transfxl':
             self.positional_encoding = PositionalEncoding(embed_dim, dropout, 2*max_decode_size-1, learn_positional_encoding, -max_decode_size+1)
-        else:
+        elif self.positional_encoding_type=='absolute':
             self.positional_encoding = PositionalEncoding(embed_dim, dropout, max_decode_size, learn_positional_encoding)
-        
-        self.transformer = nn.Transformer(d_model = embed_dim, **kwargs)
+
+        self.transformer = nn.Transformer(d_model = embed_dim, nhead = self.num_heads, **kwargs)
         
         
         for i in range(self.transformer.encoder.num_layers):
-            if self.relative_positional_encoding:
+            if self.positional_encoding_type=='relative-transfxl':
                 self.transformer.encoder.layers[i].self_attn = MultiHeadRelativeAttention(embed_dim, num_heads, self.positional_encoding, dropout, attn_weight_xavier_init_constant)
-            else:
+            elif self.positional_encoding_type=='absolute':
                 self.transformer.encoder.layers[i].self_attn = MultiHeadAttention(embed_dim, num_heads, dropout, attn_weight_xavier_init_constant)
 
 
         for i in range(self.transformer.decoder.num_layers):
-            if self.relative_positional_encoding:
+            if self.positional_encoding_type=='relative-transfxl':
                 self.transformer.decoder.layers[i].self_attn = MultiHeadRelativeAttention(embed_dim, num_heads, self.positional_encoding, dropout, attn_weight_xavier_init_constant)
-            else:
+            elif self.positional_encoding_type=='absolute':
                 self.transformer.decoder.layers[i].self_attn = MultiHeadAttention(embed_dim, num_heads, dropout, attn_weight_xavier_init_constant)
+
             self.transformer.decoder.layers[i].multihead_attn = MultiHeadAttention(embed_dim, num_heads, dropout, attn_weight_xavier_init_constant)
         
         self.tokens_out = nn.Linear(embed_dim, n_tokens)
@@ -124,14 +152,13 @@ class Factorizer(nn.Module):
         size = tgt.size(0)
         return torch.triu(torch.ones(size, size), 1).bool().to(tgt.device)
     
-    def encode(self, src):
+    def encode(self, src, need_weights=False):
         src_key_padding_mask = self.form_pad_mask(src)
         src = self.src_embedding(src)
-        
-        return self.encoder_forward(src, src_key_padding_mask = src_key_padding_mask), src_key_padding_mask
+        return self.encoder_forward(src, src_key_padding_mask = src_key_padding_mask, need_weights=need_weights), src_key_padding_mask
 
-    def prepare_embedding_for_attn(self, emb, is_first_mod, mod_is_relative):
-        if mod_is_relative:
+    def prepare_embedding_for_attn(self, emb, is_first_mod, use_pe):
+        if not use_pe:
             q = emb
             k = emb
             v = emb
@@ -156,45 +183,62 @@ class Factorizer(nn.Module):
         return q, k, v
 
     
-    def encoder_mod_forward(self, x, mod, src_mask, src_key_padding_mask, is_first_enc_mod):
-        mod_is_relative = isinstance(mod.self_attn, MultiHeadRelativeAttention)
+    def encoder_mod_forward(self, x, mod, src_mask, src_key_padding_mask, is_first_enc_mod, need_weights=False):
+        use_pe = self.positional_encoding_type=='absolute'
         def _sa_block(x, src_mask, src_key_padding_mask):
-            q, k, v = self.prepare_embedding_for_attn(x, is_first_enc_mod, mod_is_relative)
-            x = mod.self_attn(q, k, v, attn_mask=src_mask, key_padding_mask=src_key_padding_mask, need_weights=False)
-            return mod.dropout1(x)
+            q, k, v = self.prepare_embedding_for_attn(x, is_first_enc_mod, use_pe)
+            x, attn_weights = mod.self_attn(q, k, v, attn_mask=src_mask, key_padding_mask=src_key_padding_mask, need_weights=True)
+            return x, attn_weights
+            
 
         def _ff_block(x):
             x = mod.linear2(mod.dropout(mod.activation(mod.linear1(x))))
             return mod.dropout2(x)
         
         if self.norm_first:
-            x = x + _sa_block(mod.norm1(x), src_mask, src_key_padding_mask)
+            sa_block_result, attn_weights = _sa_block(mod.norm1(x), src_mask, src_key_padding_mask)
+            x = x + sa_block_result
             x = x + _ff_block(mod.norm2(x))
         else:
-            x = mod.norm1(x + _sa_block(x, src_mask, src_key_padding_mask))
+            sa_block_result, attn_weights = _sa_block(x, src_mask, src_key_padding_mask)
+            x = mod.norm1(x + sa_block_result)
             x = mod.norm2(x + _ff_block(x))
-        return x
+        if need_weights:
+            return x, attn_weights
+        else:
+            return x
 
 
-    def encoder_forward(self, src, src_mask=None, src_key_padding_mask=None):
+    def encoder_forward(self, src, src_mask=None, src_key_padding_mask=None, need_weights=False):
         x = src
+        if need_weights:
+            all_weights = []
         for i, mod in enumerate(self.transformer.encoder.layers):
-            x = self.encoder_mod_forward(x, mod, src_mask, src_key_padding_mask, i==0)
+            if need_weights:
+                x, attn_weights = self.encoder_mod_forward(x, mod, src_mask, src_key_padding_mask, i==0, need_weights=True)
+                all_weights.append(attn_weights)
+            else:
+                x = self.encoder_mod_forward(x, mod, src_mask, src_key_padding_mask, i==0)
 
         if self.transformer.encoder.norm is not None:
             x = self.transformer.encoder.norm(x)
-        return x
+
+        if need_weights:
+            return x, torch.cat(all_weights)
+        else:
+            return x
 
     def decoder_layer_forward_with_attention(self, mod, x, memory, tgt_mask=None, tgt_key_padding_mask=None, 
                                             mem_mask=None, memory_key_padding_mask=None, is_first_dec_mod=False):
-        mod_is_relative_self = isinstance(mod.self_attn, MultiHeadRelativeAttention)
+        #mod_is_relative_self = isinstance(mod.self_attn, MultiHeadRelativeAttention)
+        use_pe = self.positional_encoding_type=="absolute"
         def _sa_block(x, attn_mask, key_padding_mask):
-            q, k, v = self.prepare_embedding_for_attn(x, is_first_dec_mod, mod_is_relative_self)
+            q, k, v = self.prepare_embedding_for_attn(x, is_first_dec_mod, use_pe)
             x, attn_weights = mod.self_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask, need_weights=True)
             return mod.dropout1(x), attn_weights
 
         def _mha_block(x, mem, attn_mask, key_padding_mask):
-            if self.relative_positional_encoding:
+            if self.positional_encoding_type=='relative-transfxl':
                 if self.extra_positional_encoding_relative_decoder_mha:
                     offset = self.positional_encoding.pe.size(0) // 2 + 1
                     q = self.positional_encoding(x, pos_offset=offset)
@@ -207,18 +251,19 @@ class Factorizer(nn.Module):
                     q = x
                     k = mem
                     v = mem
-            elif self.repeat_positional_encoding:
-                q = self.positional_encoding(x)
-                # q = x
-                k = self.positional_encoding(mem)
-                if not self.positional_encoding_query_key_only:
-                    v = self.positional_encoding(mem)
+            elif self.positional_encoding_type=='absolute':
+                if self.repeat_positional_encoding:
+                    q = self.positional_encoding(x)
+                    # q = x
+                    k = self.positional_encoding(mem)
+                    if not self.positional_encoding_query_key_only:
+                        v = self.positional_encoding(mem)
+                    else:
+                        v = mem
                 else:
+                    q = x
+                    k = mem
                     v = mem
-            else:
-                q = x
-                k = mem
-                v = mem
 
             x, attn_weights = mod.multihead_attn(q, k, v, attn_mask=attn_mask, key_padding_mask=key_padding_mask, need_weights=True)
             return mod.dropout2(x), attn_weights

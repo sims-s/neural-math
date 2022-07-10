@@ -9,14 +9,17 @@ import pprint
 import sys
 import wandb
 import re
+
 sys.path.append('./src/')
 import scheduler as scheduler_module
 from tokenizer import Tokenizer
 from data_utils import prepare_dataloader
 from models import Factorizer
 from optimization_utils import run_training
-from metrics_utils import compute_factorization_metrics
+from metrics_utils import compute_metrics_any_model
 from utils import get_best_checkpoint, get_last_checkpoint
+import logging
+from pprint import pformat
 
 def get_datasets(args):
     if args['verbose']:
@@ -50,26 +53,21 @@ def get_model(args, device):
 
 def get_optimizer(args, model):
     return getattr(optim, args['optimizer']['type'])(model.parameters(), **args['optimizer']['opt_args'])
-    if args['optimizer']['type'].lower()=='adam':
-        opt = optim.Adam(model.parameters(), **args['optimizer']['opt_args'])
-    else:
-        raise ValueError('Only using adam right now')
-    return opt
 
 def get_scheduler(args, optimizer):
     # linear_schedule_with_warmup
     return getattr(scheduler_module, args['scheduler']['type'])(optimizer, **args['scheduler']['scheduler_args'])
-    if args['scheduler']['type']=='linear_schedule_with_warmup':
-        scheduler = get_linear_schedule_with_warmup(optimizer, **args['scheduler']['scheduler_args'])
-    else:
-        raise ValueError('only using linear_schedule_with_warmup right now')
-    return scheduler
 
 
 def get_model_opt_scheduler(args, device):
     model = get_model(args, device)
     optimizer = get_optimizer(args, model)
     scheduler = get_scheduler(args, optimizer)
+    if 'pretrained_path' in args and args['pretrained_path']:
+        checkpoint = torch.load(args['pretrained_path'])
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['opt_state_dict'])
+
     if args['verbose']:
         print('Successfully created model, optimizer, and scheduler')
         
@@ -99,7 +97,6 @@ def create_or_load_save_dir(args, model, optimizer, scheduler, map_location):
     
     return model, optimizer, scheduler, latest_checkpoint
 
-
 def wandb_init(args):
     if args['wandb']['enabled']:
         if 'id' in args['wandb']:
@@ -122,7 +119,6 @@ def search_dict(d, k_replace, v_replace):
         else:
             found = False
 
-
     if found and k_replace[-1] in curr_dict:
         curr_dict[k_replace[-1]] = v_replace
         return
@@ -144,7 +140,9 @@ def main(args):
     device = torch.device('cuda')
     map_location = None
 
-    tokenizer = Tokenizer(args['data']['base'])
+    assert args['model_type'] in ['factorization', 'addition']
+
+    tokenizer = Tokenizer(args['data']['base'], args['model_type'])
     args = compute_extra_args(args, tokenizer)
 
     train_loader, test_loader, oos_loader = get_datasets(args)
@@ -157,16 +155,18 @@ def main(args):
     wandb_init(args)
 
     if args['verbose']:
-        print('Running training for %d steps'%(args['scheduler']['scheduler_args']['nb_steps']))
-        print('Model args: ')
-        pprint.pprint(args['model_args'])
+        logging.info('Running training for %d steps'%(args['scheduler']['scheduler_args']['nb_steps']))
+        logging.info(f'Model Type: ', args['model_type'])
+        logging.info('Model args: ')
+        logging.info(pprint.pformat(args['model_args']))
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, oos_loader, device, args, latest_checkpoint)
 
     best_checkpoint = get_best_checkpoint(args['io']['save_path'], map_location=map_location)['model_state_dict']
     model.load_state_dict(best_checkpoint)
-    compute_factorization_metrics(model, tokenizer, device, args, args['data']['test_path'], 
+
+    compute_metrics_any_model(model, tokenizer, device, args, args['data']['test_path'], 
                 save_suffix='test')
-    compute_factorization_metrics(model, tokenizer, device, args, args['data']['oos_path'], 
+    compute_metrics_any_model(model, tokenizer, device, args, args['data']['oos_path'], 
                 save_suffix = 'oos')
 
 
@@ -174,33 +174,13 @@ if __name__ == "__main__":
     """
     TODO: (no particular order)
 
-    * Quick ideas to try:
-        * Train the model for a lot longer
-            * Use a different learning rate strategy
-        * Rerun using scaled embeddings... why didn't it diverge???
-            * Also try scaled embeddings at init
-
-        * Hypaeraomapars to ablage:
-            * Different embedding initialization/scaling
-            * embedding dim
-            * 3200 epoch run with larger weight decay
-    * Difficulty Sampling:
-        * Figure out which numbers are generically harder: sample those more frequently
-        * Like do we reeeaaalllly need 50% even numbers???
-
-    * Make max_decode_size_auto extended... or a paramater or something....
-
-
-    * UPDATES TO CONFIGS TO MAKE:
-        * OPTIMIZER: -> "Adam" instead of "adam"
-        * positional_encoding_query_key_only = False if positional encoding is true...
-
-    * Write some documentation on how the arguments work
-        * also cleanup docuemntation that's on github, becasue it's out of date
-
-    * What if the model sees the factorization in multiple bases at the same time?
-        * Diferent bases seem to perform differently, I wonder what combinding them would do
-
+    Multi Modal Model; other modes:
+        Addition/subtraction/multiplication/division/floating points/exponential
+    More complex equation solving
+    Make addition generalize better
+    How much on 3xxs do we need to learn to train on 300s?
+    What's the minimal dataset we need for good performance?
+        Will one digit in each position work?
     """
     parser = ArgumentParser()
     parser.add_argument('--config', required=True)
