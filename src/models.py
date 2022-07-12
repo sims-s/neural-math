@@ -81,7 +81,7 @@ class TransformerEmbedding(nn.Module):
         
 
 
-class Factorizer(nn.Module):
+class Seq2SeqModel(nn.Module):
     def __init__(self,  n_tokens, 
                         embed_dim, 
                         pad_token_id, 
@@ -100,7 +100,7 @@ class Factorizer(nn.Module):
                         attn_weight_xavier_init_constant = .5,
                         embedding_initialization = 'normal',
                          **kwargs):
-        super(Factorizer, self).__init__()
+        super(Seq2SeqModel, self).__init__()
         self.shared_embeddings = shared_embeddings
         self.pad_token_id = pad_token_id
         self.repeat_positional_encoding = repeat_positional_encoding

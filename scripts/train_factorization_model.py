@@ -1,9 +1,7 @@
 from argparse import ArgumentParser
-from torch._C import Value
 import yaml
 import os
 import torch
-from torch.utils.data import DataLoader
 import torch.optim as optim
 import pprint
 import sys
@@ -11,41 +9,28 @@ import wandb
 import re
 
 sys.path.append('./src/')
+sys.path.append('./problems/')
 import scheduler as scheduler_module
 from tokenizer import Tokenizer
-from data_utils import prepare_dataloader
-from models import Factorizer
+from models import Seq2SeqModel
 from optimization_utils import run_training
 from metrics_utils import compute_metrics_any_model
 from utils import get_best_checkpoint, get_last_checkpoint
 import logging
-from pprint import pformat
+from factorization import Factorization
 
-def get_datasets(args):
-    if args['verbose']:
+def get_loaders(problem):
+    if problem.args['verbose']:
         print('Loading data...')
 
-    return prepare_dataloader(args['data']['train_path'], args, **args['loader']['train'], is_train=True), \
-           prepare_dataloader(args['data']['test_path'], args, **args['loader']['test']), \
-           prepare_dataloader(args['data']['oos_path'], args, **args['loader']['oos'])
-    
+    return problem.prepare_dataloader(problem.args['data']['train_path'], **problem.args['loader']['train']), \
+           problem.prepare_dataloader(problem.args['data']['test_path'], **problem.args['loader']['test']), \
+           problem.prepare_dataloader(problem.args['data']['oos_path'], **problem.args['loader']['oos'])
 
-def compute_extra_args(args, tokenizer):
-    # # Compute input/output sizes given how we're padding things
-    # Return things related to the tokenizer
-    args['tokenizer'] = {}
-    args['tokenizer']['n_tokens'] = len(tokenizer)
-    args['tokenizer']['pad_token_id'] = tokenizer.encode('_')[0]
-
-    if re.match("pairwise_\d+", args['data']['train_path']):
-        args['data']['holdout_file'] = [args['data']['test_path'], args['data']['oos_path']]
-
-
-    return args
 
 
 def get_model(args, device):
-    model = Factorizer(n_tokens = args['tokenizer']['n_tokens'], 
+    model = Seq2SeqModel(n_tokens = args['tokenizer']['n_tokens'], 
                         pad_token_id = args['tokenizer']['pad_token_id'],
                          **args['model_args'])
     model.to(device)
@@ -67,6 +52,7 @@ def get_model_opt_scheduler(args, device):
         checkpoint = torch.load(args['pretrained_path'])
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['opt_state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
     if args['verbose']:
         print('Successfully created model, optimizer, and scheduler')
@@ -139,13 +125,14 @@ def parse_unk_args(args, unknown):
 def main(args):
     device = torch.device('cuda')
     map_location = None
+    
+    assert args['problem_type'] in ['factorization', 'addition']
 
-    assert args['model_type'] in ['factorization', 'addition']
+    problem = Factorization(args)
 
-    tokenizer = Tokenizer(args['data']['base'], args['model_type'])
-    args = compute_extra_args(args, tokenizer)
+    tokenizer = problem.get_tokenizer()
 
-    train_loader, test_loader, oos_loader = get_datasets(args)
+    train_loader, test_loader, oos_loader = get_loaders(problem)
 
     args = compute_nb_steps(args, train_loader)
     model, optimizer, scheduler, args = get_model_opt_scheduler(args, device)
@@ -156,18 +143,17 @@ def main(args):
 
     if args['verbose']:
         logging.info('Running training for %d steps'%(args['scheduler']['scheduler_args']['nb_steps']))
-        logging.info(f'Model Type: ', args['model_type'])
+        logging.info(f'Problem Type: ', args['problem_type'])
         logging.info('Model args: ')
         logging.info(pprint.pformat(args['model_args']))
+
     run_training(model, optimizer, scheduler, tokenizer, train_loader, test_loader, oos_loader, device, args, latest_checkpoint)
 
     best_checkpoint = get_best_checkpoint(args['io']['save_path'], map_location=map_location)['model_state_dict']
     model.load_state_dict(best_checkpoint)
 
-    compute_metrics_any_model(model, tokenizer, device, args, args['data']['test_path'], 
-                save_suffix='test')
-    compute_metrics_any_model(model, tokenizer, device, args, args['data']['oos_path'], 
-                save_suffix = 'oos')
+    problem.compute_metrics(model, device, args['data']['test_path'], save_suffix='test')
+    problem.compute_metrics(model, device, args['data']['oos_path'],  save_suffix = 'oos')
 
 
 if __name__ == "__main__":

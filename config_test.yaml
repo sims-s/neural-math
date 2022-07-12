@@ -3,7 +3,8 @@
   'test_path' : 'data/test_data_2^13.npy'
   'oos_path' : 'data/oos_data_2^13.npy'
   'base' : 2
-'model_type' : 'factorization'
+'problem_type' : 'factorization'
+
 'model_args':
   'embed_dim' : 64
   'num_encoder_layers' : 2
@@ -31,7 +32,7 @@
   'gradient_accumulation_steps' : 1
 
 'scheduler' : 
-  'type' : linear_schedule_with_warmup
+  'type' : get_linear_schedule_with_warmup
   'nb_epochs' : 1
   'max_steps' : 500
   'scheduler_args' : 
@@ -49,7 +50,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/eval_test/'
+  'save_path' : './models/reorg_factorization_test/'
   'checkpoint_every' : 80
   'evaluate_every' : 1
   'evaluate_final' : True

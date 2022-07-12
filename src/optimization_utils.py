@@ -12,7 +12,7 @@ sys.path.append('src/')
 import data_utils
 
 def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True, dataset=None):
-    numbers = torch.tensor(tokenizer.encode(batch['number'])).to(device)
+    numbers = torch.tensor(tokenizer.encode(batch['input'])).to(device)
     labels = torch.tensor(tokenizer.encode(batch['label'])).to(device)
     res = model(numbers, labels[:,:-1])
     loss = loss_func(res.view(-1, len(tokenizer)), labels[:,1:].reshape(-1))
@@ -51,8 +51,9 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
     for i, batch in enumerate(loader):
         loss = run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True)
         batch_loss += loss
+        global_batches +=1
         
-        if global_batches and not global_batches % grad_accum_steps:
+        if grad_accum_steps <=1 or not global_batches % grad_accum_steps:
             if max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
             opt.step()
@@ -65,7 +66,6 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
             loss_hist.append(batch_loss)
             batch_loss = 0
             model.zero_grad()
-        global_batches +=1
 
         if global_step and not global_step % checkpoint_every and not global_batches % checkpoint_every:
             global_loss_hist = checkpoint(model, opt, test_loader, oos_loader, tokenizer, loss_func, device, 
@@ -76,7 +76,6 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
         
         if global_step >= args['scheduler']['scheduler_args']['nb_steps']:
             break
-
     if global_step==args['scheduler']['scheduler_args']['nb_steps']:
             global_loss_hist = checkpoint(model, opt, test_loader, oos_loader, tokenizer, loss_func, device, 
                                             np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, 
@@ -87,6 +86,7 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
 
 
 def checkpoint(model, optimizer, test_loader, oos_loader, tokenizer, loss_func, device, train_loss, args, global_step, global_batches, loss_hist, scheduler, force_test = False):
+    print('call checkpoint function!@')
     if args['io']['save_path']:
         if not (global_step / args['io']['checkpoint_every']) % args['io']['evaluate_every'] or force_test:
             test_loss = test_on_loader(model, test_loader, tokenizer, loss_func, device)
