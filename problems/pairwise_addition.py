@@ -19,6 +19,7 @@ class PairwiseAddition(Problem):
                 '>', # start of sequence
         ]
         self.tokenizer = tokenizer.Tokenizer(self.args['data']['base'], addition_tokens)
+        self.update_tokenizer_args(self, self.tokenizer)
         return self.tokenizer
 
     def get_dataset(self, path):
@@ -49,12 +50,12 @@ class PairwiseAddition(Problem):
 
     def get_n1_n2(self, input):
         plus_idx = input.index('+')
-        n1 = base2dec(input[1:plus_idx])
-        n2 = base2dec(input[plus_idx+1:-1]) 
+        n1 = base2dec(input[1:plus_idx], self.args['data']['base'])
+        n2 = base2dec(input[plus_idx+1:-1], self.args['data']['base']) 
         return n1, n2
 
-    def postprocess(self, output, logprob, beam_idx, tokenizer, input, **kwargs):
-        number_predicted = self.decode_beam_addition(output, tokenizer, self.args['data']['base'])
+    def postprocess(self, output, logprob, beam_idx, input, **kwargs):
+        number_predicted = self.decode_beam_addition(output, self.tokenizer, self.args['data']['base'])
         base_10_n1, base_10_n2 = self.get_n1_n2(input)
         label = self.form_label(base_10_n1, base_10_n2, self.args['data']['base']),
         add_dict = {

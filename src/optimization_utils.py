@@ -10,6 +10,7 @@ import scheduler as scheduler_mod
 import sys
 sys.path.append('src/')
 import data_utils
+import warnings
 
 def run_batch(model, batch, tokenizer, loss_func, device, grad_accum_steps, train=True, dataset=None):
     numbers = torch.tensor(tokenizer.encode(batch['input'])).to(device)
@@ -86,7 +87,6 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, loss_func, device, args,
 
 
 def checkpoint(model, optimizer, test_loader, oos_loader, tokenizer, loss_func, device, train_loss, args, global_step, global_batches, loss_hist, scheduler, force_test = False):
-    print('call checkpoint function!@')
     if args['io']['save_path']:
         if not (global_step / args['io']['checkpoint_every']) % args['io']['evaluate_every'] or force_test:
             test_loss = test_on_loader(model, test_loader, tokenizer, loss_func, device)
@@ -106,17 +106,18 @@ def checkpoint(model, optimizer, test_loader, oos_loader, tokenizer, loss_func, 
 
         if args['wandb']['enabled']:
             wandb.log({'train_loss' : train_loss, 'test_loss' : test_loss, 'oos_loss' : oos_loss, 'step' : global_step})
-
-        torch.save({'model_state_dict' : model.state_dict(), 
-                    'opt_state_dict': optimizer.state_dict(), 
-                    'scheduler_state_dict' : scheduler.state_dict(),
-                    'train_loss' : train_loss, 
-                    'test_loss' : test_loss,
-                    'oos_loss' : oos_loss,
-                    'args': args, 
-                    'global_step' : global_step,
-                    'global_batches' : global_batches,},
-                    '%s/%d_%.4f.pt'%(os.path.join(args['io']['save_path'], 'checkpoints'), global_step, test_loss))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            torch.save({'model_state_dict' : model.state_dict(), 
+                        'opt_state_dict': optimizer.state_dict(), 
+                        'scheduler_state_dict' : scheduler.state_dict(),
+                        'train_loss' : train_loss, 
+                        'test_loss' : test_loss,
+                        'oos_loss' : oos_loss,
+                        'args': args, 
+                        'global_step' : global_step,
+                        'global_batches' : global_batches,},
+                        '%s/%d_%.4f.pt'%(os.path.join(args['io']['save_path'], 'checkpoints'), global_step, test_loss))
 
     return loss_hist
 
