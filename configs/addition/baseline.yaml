@@ -1,0 +1,76 @@
+'data':
+  'train_path' : 'data/addition/train_data_256.npy'
+  'test_path' : 'data/addition/test_data_256.npy'
+  'oos_path' : 'data/addition/oos_data_256.npy'
+  'base' : 10
+
+
+'problem_type' : 'addition'
+'model_args':
+  'embed_dim' : 128
+  'num_encoder_layers' : 4
+  'num_decoder_layers' : 4
+  'dim_feedforward' : 128
+  'dropout' : .05
+  'shared_embeddings' : True
+  'scale_embeddings' : False
+  'scale_embeddings_at_init' : False
+  'max_decode_size' : 64
+  'norm_first' : False
+  'learn_positional_encoding' : True
+  'repeat_positional_encoding' : True
+  'positional_encoding_query_key_only' : True
+  'positional_encoding_type' : 'relative-transfxl'
+  'extra_positional_encoding_relative_decoder_mha' : True
+  'attn_weight_xavier_init_constant' : .5
+  'embedding_initialization' : 'xavier'
+
+'optimizer': 
+  'type' : 'AdamW'
+  'opt_args' : 
+    'lr' : 0.001
+    'weight_decay' : 0.1
+  'max_grad_norm' : 1
+  'gradient_accumulation_steps' : 1
+
+'scheduler' : 
+  'type' : 'get_linear_schedule_with_warmup'
+  'nb_epochs' : 25
+  'max_steps' : -1
+  'scheduler_args' : 
+    'num_warmup_steps' : 1000
+
+    
+'loader' :
+  'train' : 
+    'batch_size' : 256
+    'random_sampling' : True # random_sampling is slightly different than shuffle b/c it allows same # to be sampled multiple times.
+                             # Benefit is that we don't need to store the numbers that've been sampled in memory --> use instead for large data sizes 
+                             # (empircally don't go too much higher than using shuffle instead 2**27)
+
+  'test' : 
+    'batch_size' : 256
+    'shuffle' : False
+  'oos' : 
+    'batch_size' : 256
+    'shuffle' : False
+'io':
+  'save_path' : './models/addition/reorg_test/'
+  'checkpoint_every' : 500
+  'evaluate_every' : 1
+  'evaluate_final' : True
+
+'metrics' : 
+  'n_beams' : 8
+  'max_num' : -1
+  'temperature' : 1.0
+
+'verbose' : True
+
+'wandb' : 
+  'enabled' : False
+  'project' : 'integer-factorization'
+  'entity' : 'sims-s'
+  'watch_args' : 
+    'log' : 'all'
+    'log_freq' : 50

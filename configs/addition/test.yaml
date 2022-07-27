@@ -1,0 +1,72 @@
+'data':
+  'train_path' : 'data/addition/train_data_256.npy'
+  'test_path' : 'data/addition/test_data_256.npy'
+  'oos_path' : 'data/addition/oos_data_256.npy'
+  'base' : 10
+    
+'problem_type' : 'addition'
+'model_args':
+  'embed_dim' : 64
+  'num_encoder_layers' : 2
+  'num_decoder_layers' : 2
+  'dim_feedforward' : 64
+  'dropout' : .1
+  'shared_embeddings' : True
+  'scale_embeddings' : False
+  'scale_embeddings_at_init' : False
+  'max_decode_size' : 64
+  'norm_first' : False
+  'learn_positional_encoding' : False
+  'repeat_positional_encoding' : True
+  'positional_encoding_query_key_only' : False
+  'positional_encoding_type' : 'absolute'
+  'extra_positional_encoding_relative_decoder_mha' : True
+  'attn_weight_xavier_init_constant' : .5
+  
+'optimizer': 
+  'type' : 'AdamW'
+  'opt_args' : 
+    'lr' : 0.001
+    'weight_decay' : 0.1
+  'max_grad_norm' : 1
+  'gradient_accumulation_steps' : 1
+
+'scheduler' : 
+  'type' : get_linear_schedule_with_warmup
+  'nb_epochs' : 1
+  'max_steps' : 500
+  'scheduler_args' : 
+    'num_warmup_steps' : 10
+    
+'loader' :
+  'train' : 
+    'batch_size' : 64
+    'random_sampling' : True 
+  'test' : 
+    'batch_size' : 256
+    'shuffle' : False
+  'oos' : 
+    'batch_size' : 256
+    'shuffle' : False
+
+'io':
+  'save_path' : './models/addition/reorg_test/'
+  'checkpoint_every' : 80
+  'evaluate_every' : 1
+  'evaluate_final' : True
+
+'metrics' : 
+  'n_beams' : 8
+  'max_num' : -1
+  'temperature' : 1.0
+  'max_num' : 100
+
+'verbose' : True
+
+'wandb' : 
+  'enabled' : False
+  'project' : 'integer-factorization'
+  'entity' : 'sims-s'
+  'watch_args' : 
+    'log' : 'all'
+    'log_freq' : 50

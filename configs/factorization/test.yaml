@@ -1,0 +1,75 @@
+'data':
+  'train_path' : 'data/train_data_2^13.npy'
+  'test_path' : 'data/test_data_2^13.npy'
+  'oos_path' : 'data/oos_data_2^13.npy'
+  'base' : 2
+'problem_type' : 'factorization'
+
+'model_args':
+  'embed_dim' : 64
+  'num_encoder_layers' : 2
+  'num_decoder_layers' : 2
+  'dim_feedforward' : 64
+  'dropout' : .1
+  'shared_embeddings' : True
+  'scale_embeddings' : False
+  'scale_embeddings_at_init' : False
+  'max_decode_size' : 64
+  'norm_first' : False
+  'learn_positional_encoding' : False
+  'repeat_positional_encoding' : True
+  'positional_encoding_query_key_only' : False
+  'positional_encoding_type' : 'absolute'
+  'extra_positional_encoding_relative_decoder_mha' : True
+  'attn_weight_xavier_init_constant' : .5
+
+'optimizer':
+  'type' : 'AdamW'
+  'opt_args' : 
+    'lr' : 0.001
+    'weight_decay' : 0
+  'max_grad_norm' : 1
+  'gradient_accumulation_steps' : 1
+
+'scheduler' : 
+  'type' : get_linear_schedule_with_warmup
+  'nb_epochs' : 1
+  'max_steps' : 500
+  'scheduler_args' : 
+    'num_warmup_steps' : 10
+
+'loader' :
+  'train' : 
+    'batch_size' : 64
+    'random_sampling' : True 
+  'test' : 
+    'batch_size' : 256
+    'shuffle' : False
+  'oos' : 
+    'batch_size' : 256
+    'shuffle' : False
+
+'io':
+  'save_path' : './models/reorg_factorization_test/'
+  'checkpoint_every' : 80
+  'evaluate_every' : 1
+  'evaluate_final' : True
+
+'metrics' : 
+  'n_beams' : 2
+  'max_num' : 100
+  'save_suffix' : 'small'
+  'temperature' : 1.0
+
+
+'verbose' : True
+
+'wandb' : 
+  'enabled' : False
+  'project' : 'integer-factorization'
+  'entity' : 'sims-s'
+  'watch_args' : 
+    'log' : 'all'
+    'log_freq' : 50
+
+
