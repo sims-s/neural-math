@@ -1,6 +1,5 @@
 import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
-from torch._six import inf
 
 
 # Adapted from https://pytorch.org/docs/stable/_modules/torch/optim/lr_scheduler.html#ReduceLROnPlateau
@@ -149,9 +148,9 @@ class ReduceLROnPlateauWithWarmup(object):
             raise ValueError('threshold mode ' + threshold_mode + ' is unknown!')
 
         if mode == 'min':
-            self.mode_worse = inf
+            self.mode_worse = float('Inf')
         else:  # mode == 'max':
-            self.mode_worse = -inf
+            self.mode_worse = -float('Inf')
 
         self.mode = mode
         self.threshold = threshold

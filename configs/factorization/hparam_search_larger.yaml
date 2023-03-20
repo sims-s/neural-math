@@ -1,23 +1,23 @@
 'data':
-  'train_path' : 'data/train_data_2^16.npy'
-  'test_path' : 'data/test_data_2^16.npy'
-  'oos_path' : 'data/oos_data_2^16.npy'
+  'train_path' : 'data/train_data_2^18.npy'
+  'test_path' : 'data/test_data_2^18.npy'
+  'oos_path' : 'data/oos_data_2^18.npy'
   'base' : 30
 
 'problem_type' : 'factorization'
 'model_args':
   'embed_dim' : 128
-  'num_encoder_layers' : 6
-  'num_decoder_layers' : 6
+  'num_encoder_layers' : 8
+  'num_decoder_layers' : 8
   'dim_feedforward' : 512
-  'dropout' : 0.05
+  'dropout' : 0.1
   'num_heads' : 8
-  'shared_embeddings' : True
-  'scale_embeddings' : False
+  'shared_embeddings' : False
+  'scale_embeddings' : True
   'scale_embeddings_at_init' : False
   'max_decode_size' : 64
   'norm_first' : False
-  'learn_positional_encoding' : False
+  'learn_positional_encoding' : True
   'repeat_positional_encoding' : False
   'positional_encoding_query_key_only' : False
   'positional_encoding_type' : 'relative-transfxl'
@@ -30,31 +30,31 @@
   'opt_args' : 
     'lr' : 0.001
     'weight_decay' : 0.1
-  'max_grad_norm' : 1
-  'gradient_accumulation_steps' : 1
+  'max_grad_norm' : .7
+  'gradient_accumulation_steps' : 2
 
 'scheduler' : 
   'type' : 'get_linear_schedule_with_warmup'
-  'nb_epochs' : 400
+  'nb_epochs' : 100
   'max_steps' : -1
   'scheduler_args' : 
-    'num_warmup_steps' : 6000
+    'num_warmup_steps' : 12000
     
 'loader' :
   'train' : 
-    'batch_size' : 256
+    'batch_size' : 128
     'random_sampling' : True # random_sampling is slightly different than shuffle b/c it allows same # to be sampled multiple times.
                              # Benefit is that we don't need to store the numbers that've been sampled in memory --> use instead for large data sizes 
                              # (empircally don't go too much higher than using shuffle instead 2**27)
 
   'test' : 
-    'batch_size' : 256
+    'batch_size' : 128
     'shuffle' : False
   'oos' : 
-    'batch_size' : 256
+    'batch_size' : 128
     'shuffle' : False
 'io':
-  'save_path' : './models/factorization/epochs_400_more_dropout/'
+  'save_path' : './models/factorization/2^18/lower_grad_norm/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True

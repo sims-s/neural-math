@@ -12,6 +12,13 @@ import torch
 from generation_utils import decode
 from optimization_utils import test_on_loader
 
+def default_collate(x):
+    return {
+            'input': [y['input'] for y in x], 
+            'label' : [y['label'] for y in x]
+            }
+
+
 class Problem:
     def __init__(self, args):
         self.args = args
@@ -54,10 +61,7 @@ class Problem:
         if loader_kwargs.pop('random_sampling', False):
             sampler = data_utils.RandomMemorylessSampler(dataset)
 
-        loader = DataLoader(dataset, collate_fn = lambda x: {
-            'input': [y['input'] for y in x], 
-            'label' : [y['label'] for y in x]
-            },
+        loader = DataLoader(dataset, collate_fn = default_collate,
             sampler = sampler,
             **loader_kwargs)
         return loader

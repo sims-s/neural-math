@@ -99,6 +99,7 @@ class Seq2SeqModel(nn.Module):
                         extra_positional_encoding_relative_decoder_mha = False,
                         attn_weight_xavier_init_constant = .5,
                         embedding_initialization = 'xavier',
+                        pad_embs_to_8_multiple = True,
                          **kwargs):
         super(Seq2SeqModel, self).__init__()
         self.shared_embeddings = shared_embeddings
@@ -115,8 +116,9 @@ class Seq2SeqModel(nn.Module):
 
         self.num_heads = num_heads
 
-        self.src_embedding = TransformerEmbedding(n_tokens, embed_dim, embedding_initialization, scale_embeddings, scale_embeddings_at_init)
-        self.tgt_embedding = TransformerEmbedding(n_tokens, embed_dim, embedding_initialization, scale_embeddings, scale_embeddings_at_init) \
+        extra_toks = 0 if not pad_embs_to_8_multiple else n_tokens % 8
+        self.src_embedding = TransformerEmbedding(n_tokens + extra_toks, embed_dim, embedding_initialization, scale_embeddings, scale_embeddings_at_init)
+        self.tgt_embedding = TransformerEmbedding(n_tokens + extra_toks, embed_dim, embedding_initialization, scale_embeddings, scale_embeddings_at_init) \
                              if not shared_embeddings else self.src_embedding
 
         if self.positional_encoding_type=='relative-transfxl':

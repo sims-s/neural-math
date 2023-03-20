@@ -7,7 +7,6 @@ from torch.utils.data import Dataset, DataLoader, Sampler
 from sympy import factorint, primepi, primerange, prime
 from torch.utils.data.sampler import BatchSampler
 import utils
-from torch._six import int_classes as _int_classes
 from typing import List
 import re
 import copy
@@ -79,7 +78,7 @@ class RandomMemorylessBatchSampler(Sampler[List[int]]):
         # Since collections.abc.Iterable does not check for `__getitem__`, which
         # is one way for an object to be an iterable, we don't do an `isinstance`
         # check here.
-        if not isinstance(batch_size, _int_classes) or isinstance(batch_size, bool) or \
+        if not isinstance(batch_size, int) or isinstance(batch_size, bool) or \
                 batch_size <= 0:
             raise ValueError("batch_size should be a positive integer value, "
                              "but got batch_size={}".format(batch_size))

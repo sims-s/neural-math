@@ -5,7 +5,6 @@ import torch
 import torch.optim as optim
 import pprint
 import sys
-import wandb
 import re
 
 sys.path.append('./src/')
@@ -84,15 +83,6 @@ def create_or_load_save_dir(args, model, optimizer, scheduler, map_location):
     
     return model, optimizer, scheduler, latest_checkpoint
 
-def wandb_init(args):
-    if args['wandb']['enabled']:
-        if 'id' in args['wandb']:
-            wandb.init(project=args['wandb']['project'], entity=args['wandb']['entity'], 
-                    id=args['wandb']['id'], config=args, resume=True)
-        else:
-            id = wandb.util.generate_id()
-            wandb.init(project=args['wandb']['project'], entity=args['wandb']['entity'], id=id, config=args)
-            args['wandb']['id'] = id
 
 def search_dict(d, k_replace, v_replace):
     if isinstance(k_replace, str):
@@ -142,8 +132,6 @@ def main(args):
     
     model, optimizer, scheduler, latest_checkpoint = create_or_load_save_dir(args, model, optimizer, scheduler, map_location)
 
-    wandb_init(args)
-
     if args['verbose']:
         logging.info('Running training for %d steps'%(args['scheduler']['scheduler_args']['nb_steps']))
         logging.info(f'Problem Type: ', args['problem_type'])
@@ -160,6 +148,7 @@ def main(args):
 
 
 if __name__ == "__main__":
+    torch.backends.cudnn.benchmark = True
     """
     TODO: (no particular order)
 

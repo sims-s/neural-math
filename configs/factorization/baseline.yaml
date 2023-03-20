@@ -45,15 +45,21 @@
     'random_sampling' : True # random_sampling is slightly different than shuffle b/c it allows same # to be sampled multiple times.
                              # Benefit is that we don't need to store the numbers that've been sampled in memory --> use instead for large data sizes 
                              # (empircally don't go too much higher than using shuffle instead 2**27)
+    'num_workers' : 4
+    'pin_memory': True
 
   'test' : 
     'batch_size' : 256
     'shuffle' : False
+    'num_workers': 4
+    'pin_memory': True
   'oos' : 
     'batch_size' : 256
     'shuffle' : False
+    'num_workers' : 4
+    'pin_memory': True
 'io':
-  'save_path' : './models/baseline/'
+  'save_path' : './models/baseline_runtime_check_2/'
   'checkpoint_every' : 10000
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -67,7 +73,7 @@
 'verbose' : True
 
 'wandb' : 
-  'enabled' : True
+  'enabled' : False
   'project' : 'integer-factorization'
   'entity' : 'sims-s'
   'watch_args' : 

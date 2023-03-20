@@ -23,6 +23,7 @@
   'extra_positional_encoding_relative_decoder_mha' : True
   'attn_weight_xavier_init_constant' : .5
   
+'mixed_precision' : False
 'optimizer':
   'type' : 'Adam'
   'opt_args' : 
@@ -40,18 +41,18 @@
 
 'loader' :
   'train' : 
-    'batch_size' : 64
+    'batch_size' : 512
     'random_sampling' : True 
   'test' : 
-    'batch_size' : 256
+    'batch_size' : 512
     'shuffle' : False
   'oos' : 
-    'batch_size' : 256
+    'batch_size' : 512
     'shuffle' : False
 
 'io':
-  'save_path' : './models/test/'
-  'checkpoint_every' : 1000
+  'save_path' : './models/small_speed_no_amp/'
+  'checkpoint_every' : 100
   'evaluate_every' : 1
   'evaluate_final' : True
 
@@ -61,13 +62,5 @@
   'save_suffix' : ''
   'temperature' : 1.0
 
-
 'verbose' : True
 
-'wandb' : 
-  'enabled' : False
-  'project' : 'integer-factorization'
-  'entity' : 'sims-s'
-  'watch_args' : 
-    'log' : 'all'
-    'log_freq' : 50
