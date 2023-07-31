@@ -7,7 +7,7 @@ io:
   checkpoint_every: 10000
   evaluate_every: 1
   evaluate_final: true
-  save_path: ./models/factorization/lower_dropout/
+  save_path: ./models/factorization/2^16/lower_dropout/
 loader:
   oos:
     batch_size: 256

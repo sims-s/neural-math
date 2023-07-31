@@ -23,7 +23,7 @@
   'extra_positional_encoding_relative_decoder_mha' : True
   'attn_weight_xavier_init_constant' : .5
   
-'mixed_precision' : False
+'mixed_precision' : True
 'optimizer':
   'type' : 'Adam'
   'opt_args' : 
@@ -51,7 +51,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/small_speed_no_amp/'
+  'save_path' : './models/test_factorization/'
   'checkpoint_every' : 100
   'evaluate_every' : 1
   'evaluate_final' : True

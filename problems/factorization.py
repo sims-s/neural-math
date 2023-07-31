@@ -9,6 +9,7 @@ import tokenizer
 from data_utils import dec2base, base2dec
 from problem import Problem, BaseDataset
 from sympy.ntheory.primetest import isprime
+import warnings
 
 
 class Factorization(Problem):
@@ -16,24 +17,26 @@ class Factorization(Problem):
         if self.tokenizer:
             return self.tokenizer
         factorization_tokens = [
-                'x', # multiplication
-                '_', #padding,
-                '.', # end of sequence
-                '>', # start of sequence
+                '*', # multiplication
+                '[PAD]', #padding,
+                '[EOS]', # end of sequence
+                '[SOS]', # start of sequence
         ]
-        self.tokenizer = tokenizer.Tokenizer(self.args['data']['base'], factorization_tokens)
-        self.update_tokenizer_args(self, self.tokenizer)
+        self.special_tokens = factorization_tokens
+        self.tokenizer = tokenizer.Tokenizer(self.args['data']['base'], self.special_tokens)
+        self.update_tokenizer_args(self.tokenizer)
         return self.tokenizer
 
-    def form_label(self, number, base):
-        factors = factorint(number, multiple=True)
+    def form_label(self, factors, base):
+        if isinstance(factors, int):
+            factors = factorint(factors, multiple=True)
         factors = [dec2base(f, base) for f in factors]
-        factors = ['>'] + utils.list_join(factors, 'x') + ['.']
+        factors = ['[SOS]'] + utils.list_join(factors, '*') + ['[EOS]']
         return factors
 
     def form_input(self, number, base):
         number = dec2base(number, base)
-        return ['>'] + number + ['.']
+        return ['[SOS]'] + number + ['[EOS]']
 
     def get_dataset(self, path):
         return FactorizationDataset(path, self.args['data']['base'], form_input=self.form_input, form_label=self.form_label)
@@ -47,9 +50,11 @@ class Factorization(Problem):
         chunked = []
         chunk_start_idx = 0
         for i, token in enumerate(factor_list):
-            if token=='x' or token =='.':
+            if token=='*' or token =='[EOS]':
                 chunked.append(factor_list[chunk_start_idx:i])
                 chunk_start_idx = i + 1
+                if token == "[EOS]":
+                    break
             elif i==len(factor_list)-1:
                 chunked.append(factor_list[chunk_start_idx:i+1])
         return chunked
@@ -64,12 +69,12 @@ class Factorization(Problem):
         }
 
         tokenized = self.tokenizer.decode(output, decode_special=True)
-        factor_list = utils.drop_from_iterable(tokenized.split(' '), ['>', '_', '.'])
+        factor_list = utils.drop_from_iterable(tokenized.split(' '), ['[SOS]', '[PAD]', '[EOS]'])
         factor_list = self.extract_factors(factor_list)
 
         try:
             factors = [base2dec([int(digit) for digit in num], self.args['data']['base']) for num in factor_list]
-        except ValueError:
+        except (IndexError, ValueError):
             factors = []
             
         information['pred_str'] = tokenized
@@ -116,7 +121,9 @@ class Factorization(Problem):
             'correct_factorization' : 'mean'
         }).astype(float).to_dict()
         
-        factor_df['log_prob_decile'] = pd.qcut(factor_df['log_prob'], q=10).apply(str)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            factor_df['log_prob_decile'] = pd.qcut(factor_df['log_prob'], q=10, duplicates='drop').apply(str)
         metrics['by_prob'] = factor_df.groupby('log_prob_decile').agg({
             'beam_idx' : 'size',
             'correct_product': 'mean',
@@ -151,7 +158,9 @@ class Factorization(Problem):
         metrics['pred_same_as_input_beam_0'] = metrics['pred_same_as_input_beam_0'].reset_index().to_dict(orient='index')
 
         nonprime_df = grouped_by_num[~grouped_by_num['input_is_prime']]
-        nonprime_df['min_factor_decile'] = pd.qcut(nonprime_df['min_target_prime_factor_if_composite'], q=10, duplicates='drop').apply(str)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            nonprime_df['min_factor_decile'] = pd.qcut(nonprime_df['min_target_prime_factor_if_composite'], q=10, duplicates='drop').apply(str)
         metrics['by_min_factor_composite_only'] = nonprime_df.groupby('min_factor_decile').agg({
             'correct_product' : ['size', lambda x: pd.Series([np.mean([any(y) for y in x])])],
             'correct_factorization' : lambda x: pd.Series([np.mean([y[0] for y in x])])
@@ -165,10 +174,11 @@ class Factorization(Problem):
 
 class FactorizationDataset(BaseDataset):    
     def __getitem__(self, i):
-        number = self.numbers[i]
+        factors = self.data[i]
+        factors = factors[factors > 1]
         return {
-            'input' : self.form_input(number, self.base),
-            'label' : self.form_label(number, self.base)
+            'input' : self.form_input(factors.prod(), self.base),
+            'label' : self.form_label(factors, self.base)
         }
 
     

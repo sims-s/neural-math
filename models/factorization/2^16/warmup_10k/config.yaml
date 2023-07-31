@@ -7,7 +7,7 @@ io:
   checkpoint_every: 10000
   evaluate_every: 1
   evaluate_final: true
-  save_path: ./models/factorization/warmup_10k/
+  save_path: ./models/factorization/2^16/warmup_10k/
 loader:
   oos:
     batch_size: 256

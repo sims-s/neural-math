@@ -7,7 +7,7 @@ io:
   checkpoint_every: 10000
   evaluate_every: 1
   evaluate_final: true
-  save_path: ./models/factorization/heads_16_embed_dim_256/
+  save_path: ./models/factorization/2^16/heads_16_embed_dim_256/
 loader:
   oos:
     batch_size: 256

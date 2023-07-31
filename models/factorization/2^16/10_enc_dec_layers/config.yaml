@@ -7,7 +7,7 @@ io:
   checkpoint_every: 10000
   evaluate_every: 1
   evaluate_final: true
-  save_path: ./models/factorization/10_enc_dec_layers/
+  save_path: ./models/factorization/2^16/10_enc_dec_layers/
 loader:
   oos:
     batch_size: 256

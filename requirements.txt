@@ -2,7 +2,7 @@ numpy
 pandas
 matplotlib
 tqdm
-torch==1.7.1
+torch==2.0.0
 pyunpack
 patool
 sympy

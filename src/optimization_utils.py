@@ -13,26 +13,20 @@ import warnings
 from torch.profiler import ProfilerActivity, profile, tensorboard_trace_handler
 from contextlib import nullcontext
 
-# def trace_handler(out_dir, p):
-#     output = p.key_averages().table(sort_by="self_cuda_time_total", row_limit=10)
-#     print(output)
-#     # p.export_chrome_trace("/tmp/trace_" + str(p.step_num) + ".json")
-#     p.export_chrome_trace(f"{out_dir}/trace_" + str(p.step_num) + ".json")
 
-# class NullContext(nullcontext):
-#     def step(self):
-#         pass
-
-
-
-def run_batch(model, batch, tokenizer, scaler, loss_func, device, grad_accum_steps, train=True, dataset=None):
+def run_batch(model, batch, tokenizer, scaler, loss_func, device, grad_accum_steps, train=True):
     numbers = torch.tensor(tokenizer.encode(batch['input'])).to(device)
     labels = torch.tensor(tokenizer.encode(batch['label'])).to(device)
 
     amp_context = nullcontext() if not scaler else torch.autocast('cuda', dtype=torch.float16)
     with amp_context:
         res = model(numbers, labels[:,:-1])
-        loss = loss_func(res.view(-1, len(tokenizer)), labels[:,1:].reshape(-1))
+        labels = labels[:,1:].reshape(-1)
+        res = res.view(-1, len(tokenizer))
+        res = res[labels != tokenizer.pad_id]
+        labels = labels[labels != tokenizer.pad_id]
+        loss = loss_func(res, labels)
+
     if train:
         loss = loss.mean()
         loss = loss / grad_accum_steps
@@ -41,23 +35,31 @@ def run_batch(model, batch, tokenizer, scaler, loss_func, device, grad_accum_ste
         else:
             loss.backward()
     else:
-        if dataset and isinstance(dataset, data_utils.FactorizationDatasetPropLoss):
-            dataset.update_weights(loss)
-        loss = loss.mean()
-    
-    return loss
+        loss = loss.sum()
+
+    if train:
+        return loss
+    else:
+        return loss, labels.size(0)
 
     
-def test_on_loader(model, loader, tokenizer, loss_func, device):
+def test_on_loader(model, loader, tokenizer, loss_func, device, max_batches=-1):
     model.eval()
-    pbar = tqdm(total = len(loader), leave=False)
+    pbar = tqdm(total = max_batches if max_batches >= 0 and max_batches < len(loader) else len(loader), leave=False)
     loss_hist = []
+    data_counter = 0
     with torch.no_grad():
         for i, batch in enumerate(loader):
-            loss_hist.append(run_batch(model, batch, tokenizer, None, loss_func, device, -1, train=False).data.cpu().numpy().item())
+            if max_batches > 0 and i >= max_batches:
+                pbar.update(len(loader) - i)
+                break
+            data_counter += len(batch[list(batch.keys())[0]])
+            batch_loss, n_labels = run_batch(model, batch, tokenizer, None, loss_func, device, -1, train=False)
+            loss_hist.append(batch_loss.data.cpu().numpy().item())
+            data_counter += n_labels
             pbar.update(1)
     pbar.close()
-    return np.mean(loss_hist)
+    return np.sum(loss_hist) / data_counter
 
 
 def run_epoch(model, opt, scheduler, loader, tokenizer, scaler, loss_func, device, args, global_step, global_batches, 
@@ -69,17 +71,6 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, scaler, loss_func, devic
     loss_hist = []
     batch_loss = 0
 
-    # run_profiling = True
-    # if run_profiling:
-    #     profiler_dir = args['io']['save_path'] + 'profiler/'
-    #     os.makedirs(profiler_dir, exist_ok=True)
-    #     profiler_context = profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-    #                   schedule = torch.profiler.schedule(wait=1, warmup=2, active=4), on_trace_ready=lambda p: trace_handler(profiler_dir, p),
-    #                   record_shapes=True, profile_memory=True)
-    # else:
-    #     profiler_context = NullContext()
-
-    # with profiler_context as p:
     for i, batch in enumerate(loader):
         loss = run_batch(model, batch, tokenizer, scaler, loss_func, device, grad_accum_steps, train=True)
         batch_loss += loss
@@ -90,16 +81,20 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, scaler, loss_func, devic
                 if scaler:
                     scaler.unscale_(opt)
                 nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
-            if scaler:
-                scaler.step(opt)
-                scaler.update()
-            else:
-                opt.step()
-            # p.step()
-            if isinstance(scheduler, scheduler_mod.ReduceLROnPlateauWithWarmup):
-                scheduler.step(batch_loss)
-            else:
-                scheduler.step()
+
+            # PT thinks opt is after scheduler
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                if scaler:
+                    scaler.step(opt)
+                    scaler.update()
+                else:
+                    opt.step()
+                # p.step()
+                if isinstance(scheduler, scheduler_mod.ReduceLROnPlateauWithWarmup):
+                    scheduler.step(batch_loss)
+                else:
+                    scheduler.step()
             pbar.update(1)
             global_step += 1
             loss_hist.append(batch_loss.item())

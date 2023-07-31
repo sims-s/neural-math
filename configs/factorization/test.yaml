@@ -50,7 +50,7 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/reorg_factorization_test/'
+  'save_path' : './models/change_tokenization/'
   'checkpoint_every' : 80
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -63,13 +63,3 @@
 
 
 'verbose' : True
-
-'wandb' : 
-  'enabled' : False
-  'project' : 'integer-factorization'
-  'entity' : 'sims-s'
-  'watch_args' : 
-    'log' : 'all'
-    'log_freq' : 50
-
-

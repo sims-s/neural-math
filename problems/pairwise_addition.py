@@ -14,32 +14,33 @@ class PairwiseAddition(Problem):
             return self.tokenizer
         addition_tokens = [
                 '+', # addition
-                '_', #padding,
-                '.', # end of sequence
-                '>', # start of sequence
+                '[PAD]', #padding,
+                '[EOS]', # end of sequence
+                '[SOS]', # start of sequence
         ]
-        self.tokenizer = tokenizer.Tokenizer(self.args['data']['base'], addition_tokens)
-        self.update_tokenizer_args(self, self.tokenizer)
+        self.special_tokens = addition_tokens
+        self.tokenizer = tokenizer.Tokenizer(self.args['data']['base'], self.special_tokens)
+        self.update_tokenizer_args(self.tokenizer)
         return self.tokenizer
 
     def get_dataset(self, path):
         return AdditionDataset(path, self.args['data']['base'], self.form_input, self.form_label)
 
     def form_input(self, n1, n2, base):
-        return ['>'] + dec2base(n1, base) + ['+'] + dec2base(n2, base) + ['.']
+        return ['[SOS]'] + dec2base(n1, base) + ['+'] + dec2base(n2, base) + ['[EOS]']
 
     def form_label(self, n1, n2, base):
-        return ['>'] + dec2base(n1 + n2, base) + ['.']
+        return ['[SOS]'] + dec2base(n1 + n2, base) + ['[EOS]']
 
     def decode_beam_addition(self, beam, tokenizer, base):
-        sos = tokenizer.encode('>')[0]
-        eos = tokenizer.encode('.')[0]
-        pad = tokenizer.encode('_')[0]
+        sos = tokenizer.sos_id
+        eos = tokenizer.eos_id
+        pad = tokenizer.pad_id
         # Ignore all padding tokens
         beam = [tok for tok in beam if not tok==pad]
         start = None if not sos in beam else beam.index(sos)
         end = None if not eos in beam else beam.index(eos)
-        if start is not None and end is not None:
+        if start is not None and end is not None and (end-start > 1):
             beam = beam[start+1:end]
             try:
                 return base2dec(beam, base)
@@ -57,7 +58,7 @@ class PairwiseAddition(Problem):
     def postprocess(self, output, logprob, beam_idx, input, **kwargs):
         number_predicted = self.decode_beam_addition(output, self.tokenizer, self.args['data']['base'])
         base_10_n1, base_10_n2 = self.get_n1_n2(input)
-        label = self.form_label(base_10_n1, base_10_n2, self.args['data']['base']),
+        label = self.form_label(base_10_n1, base_10_n2, self.args['data']['base'])
         add_dict = {
             'n1' : base_10_n1, 
             'n2' : base_10_n2, 
@@ -68,7 +69,7 @@ class PairwiseAddition(Problem):
             'label_str' : ''.join([str(c) for c in label]),
             'pred_tokens' : output.tolist(),
             'pred_num' : number_predicted,
-            'log_prob' : logprob,
+            'log_prob' : logprob.item(),
             'beam_idx' : beam_idx,  
         }
         if add_dict['pred_num'] is None:
@@ -90,9 +91,11 @@ class PairwiseAddition(Problem):
                     cmap = cmap, 
                     vmin=0
             )
-        cbar = plt.colorbar(extend='min', label='first correct beam')
+        cbar = plt.colorbar(extend='min', label='first correct beam idx')
         cbar.set_ticks(list(range(n_beams)))
         cbar.set_ticklabels(list(range(n_beams))[::-1])
+        plt.xlabel('n1')
+        plt.ylabel('n2')
         if save_path:
             plt.savefig(save_path)
             plt.clf()
@@ -128,10 +131,13 @@ class PairwiseAddition(Problem):
             if not save_suffix.startswith('_'):
                 save_suffix = '_%s'%save_suffix
 
-        acc_plot_save_path = save_dir + 'accuracy_plot'
-        if save_suffix:
-            acc_plot_save_path += save_suffix
-        acc_plot_save_path += '.png'
+        if save_dir:
+            acc_plot_save_path = save_dir + 'accuracy_plot'
+            if save_suffix:
+                acc_plot_save_path += save_suffix
+            acc_plot_save_path += '.png'
+        else:
+            acc_plot_save_path = None
         
         self.addition_accuracy_plot(aggd_by_input_str, n_beams, acc_plot_save_path)
         return metrics
@@ -141,7 +147,7 @@ class PairwiseAddition(Problem):
 
 class AdditionDataset(BaseDataset):
     def __getitem__(self, i):
-        n1, n2 = self.numbers[i]
+        n1, n2 = self.data[i]
         output =  {
             'input' : self.form_input(n1, n2, self.base),
             'label' : self.form_label(n1, n2, self.base)
@@ -150,4 +156,4 @@ class AdditionDataset(BaseDataset):
 
 
     def __len__(self):
-        return self.numbers.shape[0]
+        return len(self.data)

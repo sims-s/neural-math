@@ -111,21 +111,28 @@ class RandomMemorylessBatchSampler(Sampler[List[int]]):
 
 
 def dec2base(n, b):
+    sign = 1 if n > 0 else -1
+    n = n * sign
     if n == 0:
         return [0]
     digits = []
     while n:
         digits.append(int(n % b))
         n //= b
+    if sign < 0:
+        digits.append('-')
     return digits[::-1]
 
 def base2dec(num, base):
     total = 0
+    sign = 1 if not num[0] == '-' else -1
+    if sign < 0:
+        num = num[1:]
     for i, digit in enumerate(num[::-1]):
         if digit >= base:
             raise ValueError('Found token %d when trying to decode from base %d'%(digit, base))
         total += digit * (base ** i)
-    return total
+    return sign * total
 
 
 

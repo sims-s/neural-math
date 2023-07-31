@@ -32,8 +32,8 @@ def drop_from_iterable(lst, drop_elements):
 def load_data_file(dir_or_path):
     if dir_or_path.endswith('.json'):
         return load_json(dir_or_path)
-    else:
-        return load_json(dir_or_path + '2^%d.json'%args['data']['max_pow'])
+    # else:
+    #     return load_json(dir_or_path + '2^%d.json'%args['data']['max_pow'])
 
 def get_best_checkpoint(path, map_location=None):
     if path.endswith('.pt'):

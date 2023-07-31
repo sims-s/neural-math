@@ -5,7 +5,7 @@ import torch
 import torch.optim as optim
 import pprint
 import sys
-import re
+import shutil
 
 sys.path.append('./src/')
 sys.path.append('./problems/')
@@ -18,6 +18,7 @@ from utils import get_best_checkpoint, get_last_checkpoint
 import logging
 from factorization import Factorization
 from pairwise_addition import PairwiseAddition
+from evaluation import Evaluation
 
 def get_loaders(problem):
     if problem.args['verbose']:
@@ -48,15 +49,17 @@ def get_model_opt_scheduler(args, device):
     model = get_model(args, device)
     optimizer = get_optimizer(args, model)
     scheduler = get_scheduler(args, optimizer)
+    if args['verbose']:
+        print('Successfully created model, optimizer, and scheduler')
+
     if 'pretrained_path' in args and args['pretrained_path']:
         checkpoint = torch.load(args['pretrained_path'])
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['opt_state_dict'])
         scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        if args['verbose']:
+            print(f'Load from checkpoint {args["pretrained_path"]}')
 
-    if args['verbose']:
-        print('Successfully created model, optimizer, and scheduler')
-        
     return model, optimizer, scheduler, args
 
 def compute_nb_steps(args, train_loader):
@@ -68,8 +71,8 @@ def compute_nb_steps(args, train_loader):
 
 def create_or_load_save_dir(args, model, optimizer, scheduler, map_location):
     checkpoint_dir = os.path.join(args['io']['save_path'], 'checkpoints')
-    if os.path.exists(checkpoint_dir) and len(os.listdir(checkpoint_dir)) > 1 and not args['resume_training']:
-        raise ValueError("Save path %s already exists, but not resuming training. Add '--resume_training' to arguments to resume training"%args['io']['save_path'])
+    if os.path.exists(checkpoint_dir) and len(os.listdir(checkpoint_dir)) > 1 and not args['resume_training'] and not args['overwrite']:
+        raise ValueError("Save path %s already exists, but not resuming training. Add '--resume_training' to arguments to resume training or --overwrite to overwrite"%args['io']['save_path'])
     elif args['resume_training']:
         latest_checkpoint = get_last_checkpoint(args['io']['save_path'], map_location)
         if latest_checkpoint:
@@ -77,6 +80,8 @@ def create_or_load_save_dir(args, model, optimizer, scheduler, map_location):
             optimizer.load_state_dict(latest_checkpoint['opt_state_dict'])
             scheduler.load_state_dict(latest_checkpoint['scheduler_state_dict'])
     else:
+        if args['overwrite']:
+            shutil.rmtree(args['io']['save_path'])
         os.makedirs(args['io']['save_path'], exist_ok=True)
         os.makedirs(args['io']['save_path'] + 'checkpoints/', exist_ok=True)
         latest_checkpoint = None
@@ -84,7 +89,7 @@ def create_or_load_save_dir(args, model, optimizer, scheduler, map_location):
     return model, optimizer, scheduler, latest_checkpoint
 
 
-def search_dict(d, k_replace, v_replace):
+def search_replace_dict(d, k_replace, v_replace):
     if isinstance(k_replace, str):
         k_replace = k_replace.split('.')    
     curr_dict = d
@@ -102,26 +107,29 @@ def search_dict(d, k_replace, v_replace):
 
     for k, v in d.items():
         if isinstance(v, dict):
-            search_dict(v, k_replace, v_replace)
+            search_replace_dict(v, k_replace, v_replace)
 
 def parse_unk_args(args, unknown):
     if len(unknown) % 2:
         raise ValueError('Didnt find an even number of arg/value pairs, got %d'%len(unknown))
     args_value_pair = [(unknown[2*i], unknown[2*i+1]) for i in range(len(unknown)//2)]
     for k_replace, v_replace in args_value_pair:
-        print(k_replace, v_replace)
-        search_dict(args, k_replace.replace('-', '').lower(), v_replace)
+        if args['verbose']:
+            print(f'replace {k_replace} with {v_replace}')
+        search_replace_dict(args, k_replace.replace('-', '').lower(), v_replace)
     return args
 
 def main(args):
     device = torch.device('cuda')
     map_location = None
     
-    assert args['problem_type'] in ['factorization', 'addition']
+    assert args['problem_type'] in ['factorization', 'addition', 'evaluation']
     if args['problem_type'] == 'factorization':
         problem = Factorization(args)
     elif args['problem_type'] == 'addition':
         problem = PairwiseAddition(args)
+    elif args['problem_type'] == 'evaluation':
+        problem = Evaluation(args)
 
     tokenizer = problem.get_tokenizer()
 
@@ -159,14 +167,19 @@ if __name__ == "__main__":
     How much on 3xxs do we need to learn to train on 300s?
     What's the minimal dataset we need for good performance?
         Will one digit in each position work?
+    Train factorization model with:
+        * All prime numbers in data: model can learn them all
+        * Non prime numbers in data: model will never try to predict a # as prime
     """
     parser = ArgumentParser()
     parser.add_argument('--config', required=True)
     parser.add_argument('--resume_training', action='store_true', default=False)
+    parser.add_argument('--overwrite', action='store_true', default=False)
     args, unknown = parser.parse_known_args()
     with open(args.config, 'r') as f:
         config_args = yaml.safe_load(f)
         config_args['resume_training'] = args.resume_training
+        config_args['overwrite'] = args.overwrite
         config_args = parse_unk_args(config_args, unknown)
 
     

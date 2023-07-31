@@ -99,7 +99,7 @@ class Seq2SeqModel(nn.Module):
                         extra_positional_encoding_relative_decoder_mha = False,
                         attn_weight_xavier_init_constant = .5,
                         embedding_initialization = 'xavier',
-                        pad_embs_to_8_multiple = True,
+                        pad_embs_to_8_multiple = False,
                          **kwargs):
         super(Seq2SeqModel, self).__init__()
         self.shared_embeddings = shared_embeddings

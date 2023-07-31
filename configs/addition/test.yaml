@@ -50,23 +50,14 @@
     'shuffle' : False
 
 'io':
-  'save_path' : './models/addition/reorg_test/'
+  'save_path' : './models/addition/test_addition/'
   'checkpoint_every' : 80
   'evaluate_every' : 1
   'evaluate_final' : True
 
 'metrics' : 
   'n_beams' : 8
-  'max_num' : -1
   'temperature' : 1.0
   'max_num' : 100
 
 'verbose' : True
-
-'wandb' : 
-  'enabled' : False
-  'project' : 'integer-factorization'
-  'entity' : 'sims-s'
-  'watch_args' : 
-    'log' : 'all'
-    'log_freq' : 50

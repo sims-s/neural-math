@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 from tqdm.auto import tqdm
 import torch
-from generation_utils import decode
+from generation_utils import decode, decold
 from optimization_utils import test_on_loader
 
 def default_collate(x):
@@ -30,12 +30,12 @@ class Problem:
             self.update_tokenizer_args(self, self.tokenizer)
         return self.tokenizer
 
-    def update_tokenizer_args(self, args, tokenizer):
+    def update_tokenizer_args(self, tokenizer):
         # # Compute input/output sizes given how we're padding things
         # Return things related to the tokenizer
         self.args['tokenizer'] = {}
         self.args['tokenizer']['n_tokens'] = len(tokenizer)
-        self.args['tokenizer']['pad_token_id'] = tokenizer.encode('_')[0]
+        self.args['tokenizer']['pad_token_id'] = tokenizer.encode(['[PAD]'])[0]
 
     def get_dataset(self):
         raise NotImplementedError
@@ -48,8 +48,6 @@ class Problem:
 
     # def form_label(self, [args_for_problem]):
     #     raise NotImplementedError
-
-
 
     def prepare_dataloader(self, path_or_dataset, **loader_kwargs):
         if isinstance(path_or_dataset, str):
@@ -65,40 +63,69 @@ class Problem:
             sampler = sampler,
             **loader_kwargs)
         return loader
+    
+
+    def get_dataset_loader(self, data, **loader_kwargs):
+        if isinstance(data, str):
+            dataset = self.get_dataset(data)
+            dataloader = self.prepare_dataloader(dataset, **loader_kwargs)
+        elif isinstance(data, Dataset):
+            dataset = data
+            dataloader = self.prepare_dataloader(dataset, **loader_kwargs)
+        elif isinstance(data, DataLoader):
+            dataset = data.dataset
+            dataloader = data
+        else:
+            raise ValueError(f'type {type(data)} not understood as data; expected string (path to load), dataset, or dataloader)')
+        return dataset, dataloader
+        
 
 
-    def compute_metrics(self, model, device, path_or_dataset, save_dir=None, save_suffix='', loader_kwargs=None, **kwargs):
+
+    def compute_metrics(self, model, device, data, save=True, save_dir=None, save_suffix='', loader_kwargs=None, **kwargs):
         if loader_kwargs is None:
             loader_kwargs = {}
-        if isinstance(path_or_dataset, str):
-            dataset = self.get_dataset(path_or_dataset)
-        else:
-            dataset = path_or_dataset
-        args = self.args
-        prediction_df = self.form_prediction_df(model, device, dataset, args['model_args']['max_decode_size'],
-                               args['metrics']['n_beams'], args['metrics']['temperature'], args['metrics']['max_num'], **kwargs)
 
-        if not save_dir:
+        dataset, loader = self.get_dataset_loader(data, **loader_kwargs)
+        args = self.args
+        
+        max_decode_size = args['model_args']['max_decode_size'] if not 'max_decode_size' in kwargs else kwargs.pop('max_decode_size')
+        n_beams = args['metrics']['n_beams'] if not 'n_beams' in kwargs else kwargs.pop('n_beams')
+        temperature = args['metrics']['temperature'] if not 'temperature' in kwargs else kwargs.pop('temperature')
+        max_num = args['metrics']['max_num'] if not 'max_num' in kwargs else kwargs.pop('max_num')
+
+        if save and not save_dir:
             if 'save_path' in args['io']:
                 save_dir = args['io']['save_path']
+
+
+
+
+        prediction_df = self.form_prediction_df(model, device, dataset, max_decode_size,
+                               n_beams, temperature, max_num, **kwargs)
+
+        
         if save_suffix:
             save_name = f'{save_dir}/pred_df_{save_suffix}.csv'
         else:
             save_name = f'{save_dir}/pred_df.csv'
+        if save:
+            prediction_df.to_csv(save_name, index=False)
         
-        prediction_df.to_csv(save_name, index=False)
-
         metrics = self.aggregate_metrics(prediction_df, save_dir=save_dir, save_suffix=save_suffix)
 
-        loader = self.prepare_dataloader(dataset, **loader_kwargs)
-        metrics['loss'] = test_on_loader(model, loader, self.tokenizer, nn.CrossEntropyLoss(), device)
-        metrics['meta'] = {'n_beams' : args['metrics']['n_beams'], 'temperature' : args['metrics']['temperature']}
+        
+        metrics['loss'] = test_on_loader(model, loader, self.tokenizer, nn.CrossEntropyLoss(reduction='none'), device)
+        metrics['meta'] = {'n_beams' : n_beams, 'temperature' : temperature, 'max_decode_size' : max_decode_size}
 
-        if save_suffix:
-            save_name = f'{save_dir}/metrics_{save_suffix}.json'
-        else:
-            save_name = f'{save_dir}/metrics.json'
-        utils.save_json(metrics, save_name)
+        if save and save_dir:
+            if save_suffix:
+                save_name = f'{save_dir}/metrics_{save_suffix}.json'
+            else:
+                save_name = f'{save_dir}/metrics.json'
+            utils.save_json(metrics, save_name)
+        return prediction_df, metrics
+
 
 
 
@@ -144,8 +171,19 @@ class Problem:
 
 
 class BaseDataset(Dataset):
-    def __init__(self, number_file, base, form_input, form_label):
-        self.numbers = np.load(number_file, mmap_mode='r')
+    def __init__(self, data, base, form_input, form_label):
+        if isinstance(data, str):
+            if data.endswith('.npy'):
+                self.data = np.load(data, mmap_mode='r')
+            elif data.endswith('.csv'):
+                self.data = pd.read_csv(data).values
+                if self.data.ndim == 2 and self.data.shape[1] == 1:
+                    self.data = self.data.ravel()
+            else:
+                raise ValueError(f'data string {data} not understood')
+        else:
+            self.data = data
+
         self.base = base
         self.form_input = form_input
         self.form_label = form_label
@@ -154,4 +192,4 @@ class BaseDataset(Dataset):
         raise NotImplementedError
 
     def __len__(self):
-        return self.numbers.shape[0]
+        return self.data.shape[0]

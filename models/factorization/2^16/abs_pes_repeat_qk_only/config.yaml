@@ -7,7 +7,7 @@ io:
   checkpoint_every: 10000
   evaluate_every: 1
   evaluate_final: true
-  save_path: ./models/factorization/abs_pes_repeat_qk_only/
+  save_path: ./models/factorization/2^16/abs_pes_repeat_qk_only/
 loader:
   oos:
     batch_size: 256

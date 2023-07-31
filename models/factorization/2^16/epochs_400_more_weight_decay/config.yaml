@@ -7,7 +7,7 @@ io:
   checkpoint_every: 10000
   evaluate_every: 1
   evaluate_final: true
-  save_path: ./models/factorization/epochs_400_more_weight_decay/
+  save_path: ./models/factorization/2^16/epochs_400_more_weight_decay/
 loader:
   oos:
     batch_size: 256

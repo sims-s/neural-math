@@ -7,7 +7,7 @@ io:
   checkpoint_every: 10000
   evaluate_every: 1
   evaluate_final: true
-  save_path: ./models/factorization/dim_feedforward_2048/
+  save_path: ./models/factorization/2^16/dim_feedforward_2048/
 loader:
   oos:
     batch_size: 256

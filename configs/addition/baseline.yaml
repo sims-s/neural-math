@@ -55,7 +55,7 @@
     'batch_size' : 256
     'shuffle' : False
 'io':
-  'save_path' : './models/addition/reorg_test/'
+  'save_path' : './models/addition/baseline/'
   'checkpoint_every' : 500
   'evaluate_every' : 1
   'evaluate_final' : True
@@ -66,11 +66,3 @@
   'temperature' : 1.0
 
 'verbose' : True
-
-'wandb' : 
-  'enabled' : False
-  'project' : 'integer-factorization'
-  'entity' : 'sims-s'
-  'watch_args' : 
-    'log' : 'all'
-    'log_freq' : 50
