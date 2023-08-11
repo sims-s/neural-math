@@ -1,0 +1,69 @@
+data:
+  base: 10
+  oos_path: data/addition/oos_data_256.npy
+  test_path: data/addition/test_data_256.npy
+  train_path: data/addition/train_data_256.npy
+io:
+  checkpoint_every: 500
+  evaluate_every: 1
+  evaluate_final: true
+  save_path: ./models/addition/baseline/
+loader:
+  oos:
+    batch_size: 256
+    shuffle: false
+  test:
+    batch_size: 256
+    shuffle: false
+  train:
+    batch_size: 256
+    random_sampling: true
+metrics:
+  max_num: -1
+  n_beams: 8
+  temperature: 1.0
+model_args:
+  attn_weight_xavier_init_constant: 0.5
+  dim_feedforward: 128
+  dropout: 0.05
+  embed_dim: 128
+  embedding_initialization: xavier
+  extra_positional_encoding_relative_decoder_mha: true
+  learn_positional_encoding: true
+  max_decode_size: 64
+  norm_first: false
+  num_decoder_layers: 4
+  num_encoder_layers: 4
+  positional_encoding_query_key_only: true
+  positional_encoding_type: relative-transfxl
+  repeat_positional_encoding: true
+  scale_embeddings: false
+  scale_embeddings_at_init: false
+  shared_embeddings: true
+optimizer:
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1
+  opt_args:
+    lr: 0.001
+    weight_decay: 0.1
+  type: AdamW
+problem_type: addition
+resume_training: false
+scheduler:
+  max_steps: -1
+  nb_epochs: 25
+  scheduler_args:
+    nb_steps: 5825
+    num_warmup_steps: 1000
+  type: get_linear_schedule_with_warmup
+tokenizer:
+  n_tokens: 14
+  pad_token_id: 11
+verbose: true
+wandb:
+  enabled: false
+  entity: sims-s
+  project: integer-factorization
+  watch_args:
+    log: all
+    log_freq: 50

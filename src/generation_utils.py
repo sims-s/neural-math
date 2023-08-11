@@ -6,8 +6,8 @@ import torch
 
 def decode(model, tokenizer, device, max_decode_size, memory, memory_key_padding_mask, n_beams, temperature):
     # note: the start of sequence is always the final token; assumed in several places
-    sequences = torch.tensor(tokenizer.encode(['[SOS]'])).to(device).unsqueeze(0)
-    sequence_log_probs = torch.tensor([[0]]).to(device)
+    sequences = torch.tensor(tokenizer.encode(['[SOS]']), device=device).unsqueeze(0)
+    sequence_log_probs = torch.tensor([[0]], device=device)
     eos_token = tokenizer.encode(['[EOS]'])[0]
     pad_token = tokenizer.encode(['[PAD]'])[0]
 

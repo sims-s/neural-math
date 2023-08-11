@@ -38,8 +38,8 @@ class Factorization(Problem):
         number = dec2base(number, base)
         return ['[SOS]'] + number + ['[EOS]']
 
-    def get_dataset(self, path):
-        return FactorizationDataset(path, self.args['data']['base'], form_input=self.form_input, form_label=self.form_label)
+    def get_dataset(self, path, **dataset_kwargs):
+        return FactorizationDataset(path, self.args['data']['base'], form_input=self.form_input, form_label=self.form_label, **dataset_kwargs)
     
     def compute_base10_from_input(self, input):
         if len(input) <=1:

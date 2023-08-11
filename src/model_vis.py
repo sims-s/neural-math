@@ -30,19 +30,19 @@ def visualize_attention(input_toks, tgt_toks, model, tokenizer, device):
             ax.set_yticklabels(labels=mem_label, fontsize=16)
             
             ax.set_xticks(np.arange(len(mem_label)))
-            ax.set_xticklabels(labels=mem_label, fontsize=16)
+            ax.set_xticklabels(labels=mem_label, fontsize=16, rotation=90)
         elif attn_type=='decoder_self':
             ax.set_yticks(np.arange(len(tgt_label_attended_for)))
             ax.set_yticklabels(labels=tgt_label_attended_for, fontsize=16)
             
             ax.set_xticks(np.arange(len(tgt_label_attended_to)))
-            ax.set_xticklabels(labels=tgt_label_attended_to, fontsize=16)
+            ax.set_xticklabels(labels=tgt_label_attended_to, fontsize=16, rotation=90)
         elif attn_type=='mem':
             ax.set_yticks(np.arange(len(tgt_label_attended_for)))
             ax.set_yticklabels(labels=tgt_label_attended_for, fontsize=16)
             
             ax.set_xticks(np.arange(len(mem_label)))
-            ax.set_xticklabels(labels=mem_label, fontsize=16)
+            ax.set_xticklabels(labels=mem_label, fontsize=16, rotation=90)
         else:
             raise ValueError(f'attn type {attn_type} not understood')
 

@@ -1,20 +1,32 @@
-# Factoring numbers using transformer encoder-decoder model
+# Solving "Math Problems" with Encoder/Decoder Models
+* Factorization (4 --> 2x2)
+* Pairwise Addition (45 + 202)
+* (Expression) Evaluation (4 * (9-(4+17)))
 
 ## Run Training & Evaluation
 
-`python scripts/train_factorization_model.py --config [YOUR_CONFIG.YAML]`  
-For an example config, see [this file](config.yaml)
+`python scripts/train_model.py --config [YOUR_CONFIG.YAML]`  
+For an example config, see [this file](configs/factorization/baseline.yaml)
 
 
 ## Observations
 Model training can occur in many different bases. E.g. the number 12 can be represented as "[1][1][0][0]" in base 2, "[2][2]" in base 5 or "[12]" in bases larger than 12. (brackets indiciate a single token. i.e. in bases larger than 12, there is a single token for the number 12)
+
+### Pairwise Addition
+* In range of [0, 256], problem is quite easy - 100% test accuracy
+* 256 Model generalizes to numbers up to 299
+  * [But never seen 3 in first position of # --> significant reduction in accuracy (62%)](http://localhost:8888/notebooks/neural-primality-factorization/notebooks/%5BPairwiseAddition%5D%20ModelExploration.ipynb#Generalization-Plot)
+
+### Factorization
+Best Performing Model:
+* 96.3% factorization accuracy on test set (5% random sample) of numbers less than 2^22 (~4.2 million)
+
+
+
 * Model performance is significantly affected by the base of training. When training in prime bases, the model's degrades significantly.    
 * Different positional encodings affect the model's performance a lot. 
 * Initialization in the attention layers, should use `gain=.5`. Seems to improve performance a little bit.
-
-
-### Reading metrics.json
-(out of date, be wary)
+#### Reading metrics.json
 * correct
   * **correct_product : Percent of numbers whose predicted factors have a product equal to the original number.**
   * **correct_factorization: Percent of numbers whose prediction is a correct prime factorization (i.e. have the same product & all predicted factors are prime)**

@@ -10,6 +10,9 @@ from data_utils import dec2base, base2dec
 from problem import Problem, BaseDataset
 from sympy.ntheory.primetest import isprime
 import warnings
+import torch
+sys.path.append('./scripts/dataset_generation/')
+import evaluation_configs, generate_evaluation_data
 
 
 class Evaluation(Problem):
@@ -71,8 +74,16 @@ class Evaluation(Problem):
             tokens.append('[EOS]')
         return tokens
 
-    def get_dataset(self, path):
-        return EvaluationDataset(path, self.args['data']['base'], form_input=self.form_input, form_label=self.form_label)
+    def get_dataset(self, path, **dataset_kwargs):
+        if path.endswith('.csv'):
+            return EvaluationDataset(path, self.args['data']['base'], form_input=self.form_input, form_label=self.form_label)
+        elif path.lower().startswith('streaming_'):
+            config_name = "_".join(path.split('_')[1:])
+            if not config_name in evaluation_configs.CONFIGS:
+                raise ValueError(f'weird streaming_suffix/config: {config_name}')
+            return StreamingEvaluationDataset(self.args['data']['base'], self.form_input, self.form_label, config_name, **dataset_kwargs)
+        else:
+            raise 
     
     def compute_output(self, tokenized):
         if tokenized[:5] == '[SOS]':
@@ -86,19 +97,6 @@ class Evaluation(Problem):
             return np.nan
         # print(tokenized)
         return base2dec([int(t) if t.isdigit() else t for t in tokenized], self.args['data']['base'])
-
-        if not all([c.isdigit() for c in tokenized]) or not len(tokenized) or (len(tokenized)==1 and tokenized[0] == '-'):
-            if len(tokenized) and tokenized[0] == '-' and all([c.isdigit() for c in tokenized[1:]]):
-                tokenized = tokenized[1:]
-                sign = -1
-            else:
-                return np.nan
-        try:
-            return sign * base2dec([int(t) for t in tokenized], self.args['data']['base'])
-        except (IndexError, ValueError) as e:
-            print('huhhh??')
-            print(tokenized)
-            raise e
 
 
     def postprocess(self, output, log_prob, beam_idx, input, postprocess_minimal=False, **kwargs):
@@ -146,68 +144,6 @@ class Evaluation(Problem):
 
 
 
-        raise NotImplementedError('TODO')
-        metrics = {}
-        grouped_by_num = factor_df.groupby('input_num')
-        metrics['correct'] = grouped_by_num.agg({
-            'correct_product' : 'any',
-            'correct_factorization' : 'any'
-        }).mean(axis=0).to_dict()
-        
-        metrics['beam_accuracy'] = factor_df.groupby('beam_idx').agg({
-            'correct_product' : 'mean',
-            'correct_factorization' : 'mean'
-        }).astype(float).to_dict()
-        
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            factor_df['log_prob_decile'] = pd.qcut(factor_df['log_prob'], q=10, duplicates='drop').apply(str)
-        metrics['by_prob'] = factor_df.groupby('log_prob_decile').agg({
-            'beam_idx' : 'size',
-            'correct_product': 'mean',
-            'correct_factorization' : 'mean',
-            'percent_prime_factors_pred' : 'mean',
-        }).rename({'beam_idx' : 'group_size'}, axis=1).astype(float).to_dict()
-        
-        # Things about the target, we want to take the first one of b/c we're gruping by it. Otherwise, we want all of them as a list
-        grouped_by_num = grouped_by_num.agg({k: 'first' if ('target' in k or 'input' in k) else list for k in list(factor_df) if not k=='input_num'}).reset_index()
-        mean_size_product_factorization = ['group_size', 'correct_product_mean', 'correct_factorization_mean']
-        
-        metrics['by_num_target_factors'] = grouped_by_num.groupby('num_target_factors').agg({
-            'correct_product' : ['size', lambda x: pd.Series([np.mean([any(y) for y in x])])],
-            'correct_factorization' : lambda x: pd.Series([np.mean([any(y) for y in x])])
-        })
-        metrics['by_num_target_factors'].columns = mean_size_product_factorization
-        metrics['by_num_target_factors'] = metrics['by_num_target_factors'].to_dict()
-
-        grouped_by_num['number_decile'] = pd.qcut(grouped_by_num['input_num'], q=10).apply(str)
-        metrics['by_input_num'] = grouped_by_num.groupby('number_decile').agg({
-            'correct_product' : ['size', lambda x: pd.Series([np.mean([any(y) for y in x])])],
-            'correct_factorization' : lambda x: pd.Series([np.mean([any(y) for y in x])])
-        })
-        metrics['by_input_num'].columns = mean_size_product_factorization
-        metrics['by_input_num'] = metrics['by_input_num'].to_dict()
-
-        metrics['pred_same_as_input_beam_0'] = grouped_by_num.groupby(['input_is_prime', 'pred_same_as_input']).agg({
-            'correct_product' : ['size', lambda x: pd.Series([np.mean([y[0] for y in x])])],
-            'correct_factorization' : lambda x: pd.Series([np.mean([y[0] for y in x])])
-        })
-        metrics['pred_same_as_input_beam_0'].columns = mean_size_product_factorization
-        metrics['pred_same_as_input_beam_0'] = metrics['pred_same_as_input_beam_0'].reset_index().to_dict(orient='index')
-
-        nonprime_df = grouped_by_num[~grouped_by_num['input_is_prime']]
-        nonprime_df['min_factor_decile'] = pd.qcut(nonprime_df['min_target_prime_factor_if_composite'], q=10, duplicates='drop').apply(str)
-        metrics['by_min_factor_composite_only'] = nonprime_df.groupby('min_factor_decile').agg({
-            'correct_product' : ['size', lambda x: pd.Series([np.mean([any(y) for y in x])])],
-            'correct_factorization' : lambda x: pd.Series([np.mean([y[0] for y in x])])
-        })
-        metrics['by_min_factor_composite_only'].columns = mean_size_product_factorization
-        metrics['by_min_factor_composite_only'] = metrics['by_min_factor_composite_only'].reset_index().to_dict(orient='index')
-        
-        return metrics
-
-
-
 class EvaluationDataset(BaseDataset):    
     def __getitem__(self, i):
         expression = self.data[i]
@@ -215,5 +151,41 @@ class EvaluationDataset(BaseDataset):
             'input' : self.form_input(expression, self.base),
             'label' : self.form_label(expression, self.base)
         }
+
+
+class StreamingEvaluationDataset(torch.utils.data.Dataset):
+    def __init__(self, base, form_input, form_label, config, size, config_value_key = 'in_sample_vals', cache_size=50_000, force_oos=False, invalid_exprs=None):
+        self.base = base
+        self.form_input = form_input
+        self.form_label = form_label
+        config = evaluation_configs.CONFIGS[config]
+        for k in ['exp_vs_num_prob', 'functions', 'in_sample_vals', 'oos_vals', 'full_vals']:
+            setattr(self, k, config[k])
+        self.size = size
+        self.sampler_cache = generate_evaluation_data.ExpressionSampleCache(cache_size, self.functions, getattr(self, config_value_key), self.exp_vs_num_prob)
+        self.force_oos = force_oos
+        if invalid_exprs is None:
+            invalid_exprs = set()
+        self.invalid_exprs = invalid_exprs
+
+    def __len__(self):
+        return self.size
+    
+    def __getitem__(self, i):
+        tree = generate_evaluation_data.sample_expression(self.sampler_cache)
+        if self.force_oos and not set([node.data['val'] for _, node in tree.nodes.items() if node.data['type']=='num']).intersection(set(self.oos_vals)):
+            return self.__getitem__(i)
+        expression = generate_evaluation_data.convert_tree_to_expression(tree)
+        if expression in self.invalid_exprs:
+            return self.__getitem__(i)
+        return {
+            'input' : self.form_input(expression, self.base),
+            'label' : self.form_label(expression, self.base)
+        }
+        
+    
+
+
+        
 
     

@@ -37,7 +37,7 @@ class Problem:
         self.args['tokenizer']['n_tokens'] = len(tokenizer)
         self.args['tokenizer']['pad_token_id'] = tokenizer.encode(['[PAD]'])[0]
 
-    def get_dataset(self):
+    def get_dataset(self, data_path, **kwargs):
         raise NotImplementedError
 
     def postprocess(self, output, logprob, beam_idx, tokenizer):
@@ -49,13 +49,15 @@ class Problem:
     # def form_label(self, [args_for_problem]):
     #     raise NotImplementedError
 
-    def prepare_dataloader(self, path_or_dataset, **loader_kwargs):
+    def prepare_dataloader(self, path_or_dataset, dataset_kwargs = None, loader_kwargs = None):
         if isinstance(path_or_dataset, str):
-            dataset = self.get_dataset(path_or_dataset)
+            dataset = self.get_dataset(path_or_dataset, **({} if not dataset_kwargs else dataset_kwargs))
         else:
             dataset = path_or_dataset
 
         sampler = None
+        if loader_kwargs is None:
+            loader_kwargs = {}
         if loader_kwargs.pop('random_sampling', False):
             sampler = data_utils.RandomMemorylessSampler(dataset)
 
@@ -65,13 +67,18 @@ class Problem:
         return loader
     
 
-    def get_dataset_loader(self, data, **loader_kwargs):
+    def get_dataset_loader(self, data, loader_kwargs = None, dataset_kwargs = None):
+        if loader_kwargs is None:
+            loader_kwargs = {}
+        if dataset_kwargs is None:
+            dataset_kwargs = {}
+
         if isinstance(data, str):
-            dataset = self.get_dataset(data)
-            dataloader = self.prepare_dataloader(dataset, **loader_kwargs)
+            dataset = self.get_dataset(data, **dataset_kwargs)
+            dataloader = self.prepare_dataloader(dataset, loader_kwargs=loader_kwargs)
         elif isinstance(data, Dataset):
             dataset = data
-            dataloader = self.prepare_dataloader(dataset, **loader_kwargs)
+            dataloader = self.prepare_dataloader(dataset, loader_kwargs=loader_kwargs)
         elif isinstance(data, DataLoader):
             dataset = data.dataset
             dataloader = data
@@ -82,11 +89,13 @@ class Problem:
 
 
 
-    def compute_metrics(self, model, device, data, save=True, save_dir=None, save_suffix='', loader_kwargs=None, **kwargs):
+    def compute_metrics(self, model, device, data, save=True, save_dir=None, save_suffix='', dataset_kwargs = None, loader_kwargs=None, **kwargs):
         if loader_kwargs is None:
             loader_kwargs = {}
+        if dataset_kwargs is None:
+            dataset_kwargs = {}
 
-        dataset, loader = self.get_dataset_loader(data, **loader_kwargs)
+        dataset, loader = self.get_dataset_loader(data, loader_kwargs=loader_kwargs, dataset_kwargs=dataset_kwargs)
         args = self.args
         
         max_decode_size = args['model_args']['max_decode_size'] if not 'max_decode_size' in kwargs else kwargs.pop('max_decode_size')

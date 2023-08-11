@@ -23,8 +23,8 @@ class PairwiseAddition(Problem):
         self.update_tokenizer_args(self.tokenizer)
         return self.tokenizer
 
-    def get_dataset(self, path):
-        return AdditionDataset(path, self.args['data']['base'], self.form_input, self.form_label)
+    def get_dataset(self, path, **dataset_kwargs):
+        return AdditionDataset(path, self.args['data']['base'], self.form_input, self.form_label, **dataset_kwargs)
 
     def form_input(self, n1, n2, base):
         return ['[SOS]'] + dec2base(n1, base) + ['+'] + dec2base(n2, base) + ['[EOS]']

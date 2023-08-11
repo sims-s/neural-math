@@ -15,8 +15,8 @@ from contextlib import nullcontext
 
 
 def run_batch(model, batch, tokenizer, scaler, loss_func, device, grad_accum_steps, train=True):
-    numbers = torch.tensor(tokenizer.encode(batch['input'])).to(device)
-    labels = torch.tensor(tokenizer.encode(batch['label'])).to(device)
+    numbers = torch.tensor(tokenizer.encode(batch['input']), device=device)
+    labels = torch.tensor(tokenizer.encode(batch['label']), device=device)
 
     amp_context = nullcontext() if not scaler else torch.autocast('cuda', dtype=torch.float16)
     with amp_context:

@@ -20,13 +20,37 @@ from factorization import Factorization
 from pairwise_addition import PairwiseAddition
 from evaluation import Evaluation
 
-def get_loaders(problem):
+def get_loaders(problem,
+                train_dataset_kwargs = None, train_loader_kwargs=None,
+                test_dataset_kwargs = None, test_loader_kwargs=None,
+                oos_dataset_kwargs = None, oos_loader_kwargs = None):
     if problem.args['verbose']:
         print('Loading data...')
 
-    return problem.prepare_dataloader(problem.args['data']['train_path'], **problem.args['loader']['train']), \
-           problem.prepare_dataloader(problem.args['data']['test_path'], **problem.args['loader']['test']), \
-           problem.prepare_dataloader(problem.args['data']['oos_path'], **problem.args['loader']['oos'])
+    def select_args(*select_from):
+        for check in select_from:
+            if check:
+                return check
+        return {}
+
+    tr_ds_kwargs = select_args(train_dataset_kwargs, problem.args['data']['train_kwargs'] if 'train_kwargs' in problem.args['data'] else {})
+    test_ds_kwargs = select_args(test_dataset_kwargs, problem.args['data']['test_kwargs'] if 'test_kwargs' in problem.args['data'] else {})
+    oos_ds_kwargs = select_args(oos_dataset_kwargs, problem.args['data']['oos_kwargs'] if 'oos_kwargs' in problem.args['data'] else {})
+
+    tr_ldr_kwargs = select_args(train_loader_kwargs, problem.args['loader']['train'])
+    test_ldr_kwargs = select_args(test_loader_kwargs, problem.args['loader']['test'])
+    oos_ldr_kwargs = select_args(oos_loader_kwargs, problem.args['loader']['oos'])
+
+    test_loader = problem.prepare_dataloader(problem.args['data']['test_path'], test_ds_kwargs, test_ldr_kwargs)
+
+    if problem.args['data']['train_path'].startswith('streaming_'):
+        test_exprs = set(test_loader.dataset.data.tolist())
+        tr_ds_kwargs.update({'invalid_exprs' : test_exprs})
+    
+    train_loader = problem.prepare_dataloader(problem.args['data']['train_path'], tr_ds_kwargs, tr_ldr_kwargs)
+    oos_loader = problem.prepare_dataloader(problem.args['data']['oos_path'], oos_ds_kwargs, oos_ldr_kwargs)
+
+    return train_loader, test_loader, oos_loader
 
 
 

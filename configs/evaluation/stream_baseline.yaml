@@ -1,0 +1,67 @@
+'data':
+  'train_path' : 'streaming_baseline'
+  'train_kwargs' : 
+    'size' : 10_000_000
+  'test_path' : 'data/evaluation/val.csv'
+  'oos_path' : 'data/evaluation/oos.csv'
+  'base' : 30
+'problem_type' : 'evaluation'
+
+
+'model_args':
+  'embed_dim' : 128
+  'num_encoder_layers' : 4
+  'num_decoder_layers' : 4
+  'dim_feedforward' : 128
+  'dropout' : .05
+  'shared_embeddings' : True
+  'scale_embeddings' : False
+  'scale_embeddings_at_init' : False
+  'max_decode_size' : 64
+  'norm_first' : False
+  'learn_positional_encoding' : True
+  'repeat_positional_encoding' : True
+  'positional_encoding_type' : 'relative-transfxl'
+  'extra_positional_encoding_relative_decoder_mha' : True
+  'attn_weight_xavier_init_constant' : .5
+  'embedding_initialization' : 'xavier'
+
+'optimizer':
+  'type' : 'AdamW'
+  'opt_args' : 
+    'lr' : 0.001
+    'weight_decay' : 0
+  'max_grad_norm' : 1
+  'gradient_accumulation_steps' : 1
+
+'scheduler' : 
+  'type' : get_linear_schedule_with_warmup
+  'nb_epochs' : 25
+  'max_steps' : -1
+  'scheduler_args' : 
+    'num_warmup_steps' : 10
+
+'loader' :
+  'train' : 
+    'batch_size' : 256
+    'random_sampling' : True 
+  'test' : 
+    'batch_size' : 256
+    'shuffle' : False
+  'oos' : 
+    'batch_size' : 256
+    'shuffle' : False
+
+'io':
+  'save_path' : './models/evaluation/stream_v0/'
+  'checkpoint_every' : 100000
+  'evaluate_every' : 1
+  'evaluate_final' : True
+
+'metrics' : 
+  'n_beams' : 64
+  'temperature' : 1.0
+  'max_num' : -1
+
+
+'verbose' : True
