@@ -6,7 +6,6 @@ import torch
 from torch.utils.data import Dataset, DataLoader, Sampler
 from sympy import factorint, primepi, primerange, prime
 from torch.utils.data.sampler import BatchSampler
-import utils
 from typing import List
 import re
 import copy

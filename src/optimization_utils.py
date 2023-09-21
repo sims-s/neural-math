@@ -63,7 +63,7 @@ def test_on_loader(model, loader, tokenizer, loss_func, device, max_batches=-1):
 
 
 def run_epoch(model, opt, scheduler, loader, tokenizer, scaler, loss_func, device, args, global_step, global_batches, 
-            global_loss_hist, test_loader, oos_loader, pbar):
+            global_loss_hist, test_loader, oos_loader, test_loss_convg_thresh, pbar):
     max_grad_norm = args['optimizer']['max_grad_norm']
     grad_accum_steps = args['optimizer']['gradient_accumulation_steps']
     checkpoint_every = args['io']['checkpoint_every']
@@ -110,7 +110,10 @@ def run_epoch(model, opt, scheduler, loader, tokenizer, scaler, loss_func, devic
         
         if global_step >= args['scheduler']['scheduler_args']['nb_steps']:
             break
-    if global_step==args['scheduler']['scheduler_args']['nb_steps']:
+        if global_loss_hist and global_loss_hist[-1][2] < test_loss_convg_thresh:
+            break
+    # loss_hist.append([global_step, train_loss, test_loss, oos_loss])
+    if global_step==args['scheduler']['scheduler_args']['nb_steps'] and not global_step == global_loss_hist[-1][0]:
             global_loss_hist = checkpoint(model, opt, test_loader, oos_loader, tokenizer, scaler, loss_func, device, 
                                             np.mean(loss_hist), args, global_step, global_batches, global_loss_hist, 
                                             scheduler, args['io']['evaluate_final'])
@@ -176,6 +179,8 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
     else:
         scaler = None
 
+    test_loss_convg_thresh = -1 if not 'test_loss_convg_thresh' in args['scheduler'] else args['scheduler']['test_loss_convg_thresh']
+
     if latest_checkpoint is None:
         global_loss_hist = []
         global_step = 0
@@ -191,7 +196,7 @@ def run_training(model, optimizer, scheduler, tokenizer, train_loader, test_load
     zero_grad(model)
     for i in range(args['scheduler']['nb_epochs']):
         global_step, global_batches, global_loss_hist = run_epoch(model, optimizer, scheduler, train_loader, tokenizer, scaler, loss_func, device, args, global_step, 
-                                 global_batches, global_loss_hist, test_loader, oos_loader, pbar)
+                                 global_batches, global_loss_hist, test_loader, oos_loader, test_loss_convg_thresh, pbar)
     pbar.close()
 
     if args['verbose']:

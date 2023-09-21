@@ -1,13 +1,12 @@
 import numpy as np
 from argparse import ArgumentParser
-from sympy import factorint
 from tqdm.auto import tqdm
 import pandas as pd
 from treelib import Node, Tree
 from collections import defaultdict
 import evaluation_configs
 import os
-
+import json
 
 # Randomly sample everything we need to generate expression  in batch
 # calling np.random.choice(...) 1000 times is slower than np.random.choice(..., size=1000)
@@ -222,9 +221,30 @@ non_associative_functions = ['^', '/', '—']
 function_to_nargs = defaultdict(lambda: 2)
 
 
+def get_n_samples(args, config):
+    results = {}
+    keys = ['train', 'val', 'oos']
+    for k in keys:
+        k = f'{k}_samples'
+        from_config = -1 if not k in config else config[k]
+        from_args = getattr(args, k)
+        if from_args >= 0:
+            results[k] = from_args
+        elif from_config >= 0:
+            results[k] = from_config
+    return results['train_samples'], results['val_samples'], results['oos_samples']
+        
+
+
 def main(args):
     np.random.seed(args.seed)
+    
     config = evaluation_configs.CONFIGS[args.config]
+    for k in ['exp_vs_num_prob', 'in_sample_vals', 'oos_vals']:
+        if not isinstance(config[k], np.ndarray):
+            config[k] = np.array(config[k])
+
+    
     exp_vs_num_prob = config['exp_vs_num_prob']
     functions = config['functions']
     
@@ -233,20 +253,24 @@ def main(args):
     out_of_sample_vals = config['oos_vals']
     full_vals = config['full_vals']
 
+    train_samples, val_samples, oos_samples = get_n_samples(args, config)
 
     dfs = {}
-    dfs['val'] = create_sample_df(args.val_samples, exp_vs_num_prob, functions, value_range_in_sample, None)
-    dfs['oos'] = create_sample_df(args.oos_samples, exp_vs_num_prob, functions, full_vals, out_of_sample_vals)
+    dfs['val'] = create_sample_df(val_samples, exp_vs_num_prob, functions, value_range_in_sample, None)
+    # print('Made VAL!')
+    dfs['oos'] = create_sample_df(oos_samples, exp_vs_num_prob, functions, full_vals, out_of_sample_vals)
+    # print('Made OOS!')
 
     val_vals = None if dfs['val'] is None else set(dfs['val']['expression'].tolist())
-    dfs['train'] = create_sample_df(args.train_samples, exp_vs_num_prob, functions, value_range_in_sample, None, invalid_exprs=val_vals)
+    dfs['train'] = create_sample_df(train_samples, exp_vs_num_prob, functions, value_range_in_sample, None, invalid_exprs=val_vals)
+    # print('Made Train!')
 
     
     os.makedirs(args.save_dir, exist_ok=True)
 
     for k, v in dfs.items():
         if v is not None:
-            save_name = f'{k}{"_" + args.suffix if args.suffix else ""}.csv'
+            save_name = f'{k}{"_" + args.suffix if args.suffix else "_" + args.config}.csv'
             v[['expression']].to_csv(args.save_dir + save_name, index=False)
             print(k, v.shape)
 
@@ -256,9 +280,9 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('--config', type=str, default='baseline')
-    parser.add_argument('--train_samples', type=int, default=10_000_000)
-    parser.add_argument('--val_samples', type=int, default=10_000)
-    parser.add_argument('--oos_samples', type=int, default=10_000)
+    parser.add_argument('--train_samples', type=int, default=-1)
+    parser.add_argument('--val_samples', type=int, default=-1)
+    parser.add_argument('--oos_samples', type=int, default=-1)
     parser.add_argument('--sample_cache_size', type=int, default=50_000)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--save_dir', default='data/evaluation/')

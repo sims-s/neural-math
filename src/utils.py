@@ -35,7 +35,7 @@ def load_data_file(dir_or_path):
     # else:
     #     return load_json(dir_or_path + '2^%d.json'%args['data']['max_pow'])
 
-def get_best_checkpoint(path, map_location=None):
+def get_best_checkpoint(path, map_location=None, just_path=False):
     if path.endswith('.pt'):
         chosen_path = path
     else:
@@ -53,6 +53,8 @@ def get_best_checkpoint(path, map_location=None):
             best_loss_idx = indicies_of_best_losses[np.argmax(best_loss_steps)]
 
         chosen_path = path + files[best_loss_idx]
+    if just_path:
+        return chosen_path
     print('Loading model at %s'%chosen_path)
     return torch.load(chosen_path, map_location=map_location)
 
