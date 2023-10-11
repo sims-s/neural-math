@@ -15,7 +15,7 @@ Model training can occur in many different bases. E.g. the number 12 can be repr
 ### Pairwise Addition
 * In range of [0, 256], problem is quite easy - 100% test accuracy
 * 256 Model generalizes to numbers up to 299
-  * [But never seen 3 in first position of # --> significant reduction in accuracy (62%)](http://localhost:8888/notebooks/neural-primality-factorization/notebooks/%5BPairwiseAddition%5D%20ModelExploration.ipynb#Generalization-Plot)
+  * [But never seen 3 in first position of # --> significant reduction in accuracy (62%)](https://nbviewer.org/github/sims-s/neural-math/blob/main/notebooks/%5BPairwiseAddition%5D%20ModelExploration.ipynb#Generalization-Plot)
 
 ### Factorization
 Best Performing Model:
