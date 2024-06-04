@@ -2,10 +2,10 @@
     'train_path' : 'data/train_data_2^16.npy'
     'test_path' : 'data/test_data_2^16.npy'
     'oos_path' : 'data/oos_data_2^16.npy'
-    'base' : 30
-  
-  'problem_type' : 'factorization'
-  'model_args':
+    'base' : 5
+
+'problem_type' : 'factorization'
+'model_args':
     'embed_dim' : 128
     'num_encoder_layers' : 6
     'num_decoder_layers' : 6
@@ -25,7 +25,7 @@
     'attn_weight_xavier_init_constant' : .5
     'embedding_initialization' : 'xavier'
   
-  'optimizer': 
+'optimizer': 
     'type' : 'AdamW'
     'opt_args' : 
       'lr' : 0.001
@@ -33,41 +33,41 @@
     'max_grad_norm' : 1
     'gradient_accumulation_steps' : 1
   
-  'scheduler' : 
+'scheduler' : 
     'type' : 'get_linear_schedule_with_warmup'
-    'nb_epochs' : 400
+    'nb_epochs' : 200
     'max_steps' : -1
     'scheduler_args' : 
       'num_warmup_steps' : 6000
       
-  'loader' :
-    'train' : 
+'loader' :
+  'train' : 
       'batch_size' : 256
       'random_sampling' : True # random_sampling is slightly different than shuffle b/c it allows same # to be sampled multiple times.
                                # Benefit is that we don't need to store the numbers that've been sampled in memory --> use instead for large data sizes 
                                # (empircally don't go too much higher than using shuffle instead 2**27)
   
-    'test' : 
+  'test' : 
       'batch_size' : 256
       'shuffle' : False
-    'oos' : 
+  'oos' : 
       'batch_size' : 256
       'shuffle' : False
-  'io':
-    'save_path' : './models/factorization/epochs_400_more_dropout/'
+'io':
+    'save_path' : './models/factorization/2^16/base_5/'
     'checkpoint_every' : 10000
     'evaluate_every' : 1
     'evaluate_final' : True
   
-  'metrics' : 
+'metrics' : 
     'n_beams' : 2
     'max_num' : -1
     'save_suffix' : ''
     'temperature' : 1.0
   
-  'verbose' : True
+'verbose' : True
   
-  'wandb' : 
+'wandb' : 
     'enabled' : False
     'project' : 'integer-factorization'
     'entity' : 'sims-s'

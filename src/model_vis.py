@@ -52,16 +52,19 @@ def visualize_attention(input_toks, tgt_toks, model=None, tokenizer=None, device
         else:
             raise ValueError(f'attn type {attn_type} not understood')
 
-        im = ax.imshow(matrix, cmap='Blues')
+        im = ax.imshow(matrix, cmap='Blues', vmin=0, vmax=1)
         fig.colorbar(im, ax=ax)
-        fig.tight_layout()
+        # fig.tight_layout()
 
-    fig, ax = plt.subplots(ee_attn.size(0), ee_attn.size(1))
+    inches_size = 36
+    # print('incehs size: ', inches_size)
+    fig, ax = plt.subplots(ee_attn.size(0), ee_attn.size(1), figsize = (inches_size, inches_size))
     for i in range(ee_attn.size(0)):
         for j in range(ee_attn.size(1)):
             title = '%s Layer: %d Head: %d'%('EncEnc', i,j)
             show_attn(fig, ax[i,j], ee_attn[i][j].data.cpu().numpy(), 'encoder_self', title)
-    fig.set_size_inches(36,36)
+    
+    fig.set_size_inches(inches_size, inches_size)
     fig.tight_layout()
 
 
@@ -70,7 +73,7 @@ def visualize_attention(input_toks, tgt_toks, model=None, tokenizer=None, device
         for j in range(ed_attn.size(1)):
             title = '%s Layer: %d Head: %d'%('EncDec', i,j)
             show_attn(fig, ax[i,j], ed_attn[i][j].data.cpu().numpy(), 'mem', title)
-    fig.set_size_inches(36,36)
+    fig.set_size_inches(inches_size, inches_size)
     fig.tight_layout()
 
     fig, ax = plt.subplots(dd_attn.size(0), dd_attn.size(1))
@@ -78,7 +81,7 @@ def visualize_attention(input_toks, tgt_toks, model=None, tokenizer=None, device
         for j in range(dd_attn.size(1)):
             title = '%s Layer: %d Head: %d'%('DecDec', i,j)
             show_attn(fig, ax[i,j], np.clip(dd_attn[i][j].data.cpu().numpy(), a_min=0, a_max=1), 'decoder_self', title)
-    fig.set_size_inches(36,36)
+    fig.set_size_inches(inches_size, inches_size)
     fig.tight_layout()
 
 

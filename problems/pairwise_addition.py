@@ -92,6 +92,7 @@ class PairwiseAddition(Problem):
                     vmin=0
             )
         cbar = plt.colorbar(extend='min', label='first correct beam idx')
+        # print(list(range(n_beams)))
         cbar.set_ticks(list(range(n_beams)))
         cbar.set_ticklabels(list(range(n_beams))[::-1])
         plt.xlabel('n1')
@@ -112,7 +113,7 @@ class PairwiseAddition(Problem):
 
     def aggregate_metrics(self, addition_df, save_dir, save_suffix):
         metrics = {}
-        n_beams = addition_df['beam_idx'].max()
+        n_beams = addition_df['beam_idx'].max() + 1
         grouped_by_input_str = addition_df.groupby('input_str')
         metrics['correct_sum'] = grouped_by_input_str.agg({
             "pred_is_right": "any"

@@ -43,7 +43,11 @@ class BaseAttention(nn.Module):
             if attn_mask is None:
                 attn_mask = key_padding_mask
             else: 
+                attn_mask = attn_mask.unsqueeze(0).repeat(key_padding_mask.size(0), 1, 1)
+                # print(attn_mask.size(), key_padding_mask.size())
                 attn_mask = attn_mask.logical_or(key_padding_mask)
+                # print(attn_mask.size())
+                # sys.exit()
         if attn_mask is not None:
             new_attn_mask = torch.zeros_like(attn_mask, dtype=torch.float)
             new_attn_mask.masked_fill_(attn_mask, float("-inf"))
